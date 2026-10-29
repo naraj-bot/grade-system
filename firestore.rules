@@ -8,6 +8,20 @@ service cloud.firestore {
     function isSuper() { return signedIn() && role() == 'superadmin'; }
     function isAdmin() { return signedIn() && (role() == 'superadmin' || role() == 'schooladmin'); }
 
+    // ครูมีสิทธิ์เขียนข้อมูลของวิชา เมื่อมีใบลงทะเบียนสอนที่อนุมัติแล้ว (id = ปี_ภาคเรียน_uid)
+    function regPath(year, term) {
+      return /databases/$(database)/documents/registrations/$(string(year) + '_' + term + '_' + request.auth.uid);
+    }
+    function approved(year, term, code) {
+      return exists(regPath(year, term))
+        && get(regPath(year, term)).data.status == 'ok'
+        && code in get(regPath(year, term)).data.codes;
+    }
+    // คีย์ของเอกสารคะแนนขึ้นต้นด้วยรหัสวิชา (ตามด้วย | หรือ ~)
+    function teachesSubject(d) {
+      return approved(d.year, '1', d.sub.split('[|~]')[0]) || approved(d.year, '2', d.sub.split('[|~]')[0]);
+    }
+
     // ผู้ใช้: อ่านโปรไฟล์ตนเองได้ แอดมินอ่านได้ทั้งหมด
     // การสร้างบัญชี/รีเซ็ตรหัสทำผ่าน /api/users (Admin SDK) เท่านั้น
     // ผู้ใช้แก้ได้เฉพาะ mustChangePassword ของตนเอง (เพื่อบังคับเปลี่ยนรหัสครั้งแรก)
@@ -60,8 +74,25 @@ service cloud.firestore {
     // ข้อมูลการทำงานรายปี (คะแนน ค่าตั้งวิชา เวลาเรียน ประเมิน กิจกรรม ปพ.5 ฯลฯ) id = ปี~หมวด~คีย์
     // อ่าน/เขียนได้เมื่อล็อกอิน (ระยะต่อไปจะเข้มขึ้นให้เขียนได้เฉพาะครูที่ได้รับอนุมัติของวิชานั้น)
     match /work/{id} {
-      allow read, write: if signedIn();
+      allow read: if signedIn();
+      // ข้อมูลวิชา (คะแนน ค่าตั้ง เวลาเรียน ประเมิน ปพ.5): แอดมิน หรือครูที่ได้รับอนุมัติวิชานั้น
+      // กิจกรรม ชุมนุม ใบแจ้งผล: ผู้ล็อกอินทุกคน (ระบบฝั่งหน้าเว็บคุมสิทธิ์ตามครูที่ปรึกษา)
+      allow create, update: if signedIn() && (
+        isAdmin()
+        || request.resource.data.bucket in ['acts', 'members', 'rpt']
+        || teachesSubject(request.resource.data));
+      allow delete: if signedIn() && (isAdmin() || resource.data.bucket in ['acts', 'members', 'rpt']);
     }
+
+    // แจ้งเตือน: อ่านได้เฉพาะผู้รับ (หรือแอดมินถ้าส่งถึง admins) ส่งได้เมื่อระบุผู้ส่งเป็นตนเอง
+    match /notifications/{id} {
+      allow read: if signedIn() && (resource.data.to == request.auth.uid
+        || (resource.data.to == 'admins' && isAdmin()));
+      allow create: if signedIn() && request.resource.data.from == request.auth.uid
+        && request.resource.data.text.size() < 400;
+      allow update, delete: if false;
+    }
+
     // ลายเซ็นอิเล็กทรอนิกส์: ทุกคนอ่านได้ (ใช้พิมพ์ในเล่ม) เจ้าของหรือแอดมินเขียน
     match /sigs/{uid} {
       allow read: if signedIn();

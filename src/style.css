@@ -179,3 +179,8 @@ details>summary{cursor:pointer}
 @font-face{font-family:'TH SarabunPSK';font-weight:400;src:url(/fonts/THSarabunPSK.ttf)}
 @font-face{font-family:'TH SarabunPSK';font-weight:700;src:url(/fonts/THSarabunPSK-Bold.ttf)}
 @font-face{font-family:'TH SarabunPSK';font-weight:400;font-style:italic;src:url(/fonts/THSarabunPSK-Italic.ttf)}
+
+/* กระดิ่งแจ้งเตือน */
+.bell{position:relative}.bdot{position:absolute;top:-6px;right:-6px;background:var(--bad,#b3261e);color:#fff;border-radius:99px;font-size:.7rem;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px}
+.bpanel{position:absolute;right:0;top:calc(100% + 8px);width:min(340px,88vw);max-height:60vh;overflow:auto;background:#fff;border:1px solid var(--line,#e2d6d0);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.2);padding:12px;display:grid;gap:8px;z-index:40}
+.bitem{display:grid;gap:2px;text-align:left;background:#fff;border:1px solid var(--line,#e2d6d0);border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer}.bitem.new{background:var(--gold-soft,#fbf3d6);border-color:var(--gold,#c8a032)}

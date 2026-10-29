@@ -4,6 +4,7 @@ import { db } from '../firebase'
 import { useAuth } from '../auth'
 import { useData } from '../data'
 import { useRegs } from '../lib/useRegs'
+import { notify } from '../lib/notify'
 import { LEVELS, REG_STATUS, isAdminRole } from '../lib/constants'
 
 const pillOf = (s) => (s === 'ok' ? 'p-good' : s === 'pending' ? 'p-warn' : 'p-bad')
@@ -21,12 +22,15 @@ function Codes({ codes, catalog }) {
 
 // แอดมิน: อนุมัติ/ส่งกลับใบลงทะเบียนสอนของครู
 function AdminView({ regs }) {
+  const { user } = useAuth()
   const { term, catalog } = useData()
   const [msgs, setMsgs] = useState({})
   const list = regs.filter((r) => r.term === term).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-  const act = (r, status) => {
+  const act = async (r, status) => {
     if (status === 'back' && !(msgs[r.id] || '').trim()) return alert('พิมพ์ข้อความถึงครูก่อนส่งกลับ')
-    return updateDoc(doc(db, 'registrations', r.id), { status, msg: status === 'back' ? msgs[r.id].trim() : '', updatedAt: Date.now() })
+    const msg = status === 'back' ? msgs[r.id].trim() : ''
+    await updateDoc(doc(db, 'registrations', r.id), { status, msg, updatedAt: Date.now() })
+    notify(r.uid, status === 'ok' ? `แอดมินอนุมัติการลงทะเบียนสอนของคุณแล้ว (ภาคเรียนที่ ${r.term})` : `แอดมินส่งการลงทะเบียนกลับ: ${msg}`, 'reg', user.uid)
   }
   return (
     <div className="stack">
@@ -78,6 +82,7 @@ function TeacherView({ regs }) {
         year: openYear.year, term, uid: user.uid, name: user.name,
         codes: [...picked], status: admin ? 'ok' : 'pending', msg: '', updatedAt: Date.now(),
       })
+      if (!admin) notify('admins', `${user.name} ส่งลงทะเบียนสอน ${picked.size} วิชา (ภาคเรียนที่ ${term}) รออนุมัติ`, 'reg', user.uid)
     } finally { setBusy(false) }
   }
 

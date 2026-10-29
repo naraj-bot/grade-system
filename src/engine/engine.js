@@ -4,13 +4,14 @@
 import { collection, deleteDoc, doc, onSnapshot, query, setDoc, where } from 'firebase/firestore'
 import { db } from '../firebase'
 import { printCss } from './printcss'
+import { buildXlsx } from '../lib/xlsx'
 
 const $ = (s) => document.querySelector(s)
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const LOGO = location.origin + '/logo.png'
 const LEVELS = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3']
 const isPri = (l) => l.startsWith('ป.')
-const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'sign', 'school', 'guide']
+const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'summary', 'sign', 'school', 'guide']
 
 let CAT = []
 let STU = []
@@ -32,13 +33,16 @@ const S = {
   page: 'scores', term: 1, year: 0, role: '', scCode: null,
   scores: {}, cfg: {}, ab: {}, rs: {}, ev: {}, sign: {}, fix: {}, meta: {}, acts: {}, members: {}, rpt: {},
   sigs: {}, school: defaultSchool(), guidance: 'none', regs: [], openSubj: new Set(), notes: [],
-  evKind: 'a', actLevel: 'ป.3', rpLevel: 'ป.3', rpStu: null, clubLv: 'ป.3', allSubj: false,
+  evKind: 'a', actLevel: 'ป.3', rpLevel: 'ป.3', rpStu: null, clubLv: 'ป.3', allSubj: false, sumLv: null,
 }
 const BUCKETS = ['scores', 'cfg', 'ab', 'rs', 'ev', 'sign', 'fix', 'meta', 'acts', 'members', 'rpt']
 
 const me = () => USERS[S.role]
 const isAdmin = () => me().kind !== 'teacher'
 function note() {}
+function notify(to, text, link) {
+  setDoc(doc(collection(db, 'notifications')), { to, text, link: link || '', from: S.role, ts: Date.now() }).catch(() => {})
+}
 function toast(t) {
   let e = $('#toast')
   if (!e) { e = document.createElement('div'); e.id = 'toast'; e.className = 'toast'; document.body.appendChild(e) }
@@ -462,6 +466,63 @@ function homeroomCard() {
   ${LEVELS.map((l) => `<div class="row"><b style="min-width:40px">${l}</b>${TEACHERS.map((t) => `<button class="chip" aria-pressed="${(HOMEROOM[l] || []).includes(t.uid)}" data-hr="${l}" data-uid="${t.uid}">${esc(t.name)}</button>`).join('') || '<span class="small muted">ยังไม่มีบัญชีครู</span>'}</div>`).join('')}</div>`
 }
 
+
+/* ---------- สรุปผลรายห้อง ---------- */
+function sumLevels() { return isAdmin() ? LEVELS : LEVELS.filter((l) => (HOMEROOM[l] || []).includes(S.role)) }
+function sumData(L) {
+  const D = rptData(L, S.term), M = D.mode
+  const clubOf = (s) => { const m = Object.values(S.members).find((m) => (m.ids || []).includes(s.id)); return m ? ((m.v || {})[s.id] || '-') : '-' }
+  const actOf = (s, a) => (a === 'ชุมนุม' ? clubOf(s) : (((S.acts[L + '|' + a] || {}).v || {})[s.id] || '-'))
+  const rows = D.stus.map((s) => {
+    const rs = D.cal.map((x) => x.R.find((q) => q.s.id === s.id))
+    const cells = rs.map((r) => (M === 'p1' ? (r.cur == null ? '' : Math.round(r.cur * 10) / 10) : (r.g == null ? '' : r.g)))
+    const gn = rs.map((r) => r.g).filter((g) => typeof g === 'number')
+    const ap = rs.filter((r) => r.pct != null)
+    return { s, cells, gpa: M === 'p1' ? null : (gn.length ? gn.reduce((a, b) => a + b, 0) / gn.length : null),
+      att: ap.length ? ap.reduce((a, r) => a + r.pct, 0) / ap.length : null,
+      ms: rs.filter((r) => r.g === 'มส').length, ro: rs.filter((r) => r.g === 'ร').length,
+      acts: ACTS.map((a) => actOf(s, a)) }
+  })
+  return { D, rows, M }
+}
+const SUM_NOTE = { p1: 'ภาคเรียนที่ 1 ประถม: คะแนนเต็มวิชาละ 50 ยังไม่ตัดสินระดับผลการเรียน', p2: 'ผลการเรียนทั้งปีของประถม (ภาคเรียนที่ 1 + 2 = 100)', s: 'ผลการเรียนมัธยมของภาคเรียนนี้' }
+function sumTable(L, forPrint) {
+  const { D, rows, M } = sumData(L), sh = (c) => c.name.replace(/\s+\d+$/, '')
+  const head = D.cal.map((x) => (forPrint ? `<th class="rot"><span class="rv">${esc(x.c.code)} ${esc(sh(x.c))}</span></th>` : `<th title="${esc(x.c.name)}">${esc(x.c.code)}<br><span class="small">${esc(sh(x.c))}</span></th>`)).join('')
+  const ah = ACTS.map((a) => (forPrint ? `<th class="rot"><span class="rv">${esc(a.length > 14 ? a.slice(0, 14) + '…' : a)}</span></th>` : `<th>${esc(a.length > 12 ? a.slice(0, 12) + '…' : a)}</th>`)).join('')
+  const body = rows.map((r) => `<tr><td class="num">${r.s.no}</td><td>${esc(r.s.name)}</td>${r.cells.map((c) => `<td class="num">${c}</td>`).join('')}<td class="num">${r.gpa == null ? '-' : r.gpa.toFixed(2)}</td><td class="num">${r.att == null ? '-' : r.att.toFixed(0)}</td>${r.acts.map((a) => `<td class="num">${a}</td>`).join('')}</tr>`).join('')
+  return `<table class="rt2 sumt"><thead><tr><th>ที่</th><th>ชื่อ-สกุล</th>${head}<th>${M === 'p1' ? '-' : 'GPA'}</th><th>เวลา %</th>${ah}</tr></thead><tbody>${body}</tbody></table>`
+}
+function sumPage(L) {
+  const { D } = sumData(L), hr = (HOMEROOM[L] || []).map((h) => USERS[h].name).join(', ')
+  return `<div class="pg sum"><style>.sum th,.sum td{font-size:10.5pt!important;padding:0 2px!important;line-height:1.05}.sum th.rot{height:40mm}.sum td:nth-child(2){text-align:left;white-space:nowrap}.sum h3{font-size:15pt!important}</style>
+  <h3 style="text-align:center">สรุปผลการเรียนรายห้อง ชั้น ${L} ภาคเรียนที่ ${D.T} ปีการศึกษา ${S.year}</h3>
+  <div style="text-align:center">${esc(S.school.name)}</div>${sumTable(L, true)}
+  <div class="small">${SUM_NOTE[D.mode]} · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน</div>
+  <div class="small">ครูที่ปรึกษา: ${esc(hr || '-')}</div></div>`
+}
+P.summary = () => {
+  const lv = sumLevels()
+  if (!lv.length) return '<div class="card empty">หน้านี้สำหรับแอดมินและครูที่ปรึกษาประจำชั้น (แอดมินกำหนดครูที่ปรึกษาที่หน้า "ตั้งค่าโรงเรียน")</div>'
+  if (!lv.includes(S.sumLv)) S.sumLv = lv[0]
+  const L = S.sumLv, { D, rows, M } = sumData(L)
+  return `<div class="stack"><div class="row">${lv.map((l) => `<button class="chip" aria-pressed="${l === L}" data-sumlv="${l}">${l}</button>`).join('')}</div>
+  <div class="row">${[1, 2].map((t) => `<button class="chip" aria-pressed="${S.term === t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>
+  <div class="card stack"><h3>สรุปผลการเรียนรายห้อง ${L} ภาคเรียนที่ ${D.T}</h3><div class="small muted">${SUM_NOTE[M]}</div>
+  ${D.stus.length && D.cal.length ? `<div class="row"><button class="btn sm" data-act="sumdl" data-f="PDF">PDF</button><button class="btn sm alt" data-act="sumdl" data-f="Excel">Excel</button></div>
+  <div class="tw">${sumTable(L, false)}</div>
+  <div class="small muted">รวม มส. ${rows.reduce((a, r) => a + r.ms, 0)} รายการ · ร ${rows.reduce((a, r) => a + r.ro, 0)} รายการ</div>` : '<div class="empty">ชั้นนี้ยังไม่มีนักเรียนหรือรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}</div></div>`
+}
+function sumName(L, ext) { return `สรุปผลการเรียน_${L}_ภาคเรียน${S.term}_ปีการศึกษา${S.year}.${ext}`.replace(/[\\/:*?"<>|]/g, '') }
+function downloadSummary(f) {
+  const L = S.sumLv, { D, rows, M } = sumData(L)
+  if (f === 'PDF') return printPages(sumName(L, 'pdf').replace(/\.pdf$/, ''), sumPage(L))
+  const sh = (c) => c.name.replace(/\s+\d+$/, '')
+  const head = ['เลขที่', 'ชื่อ-สกุล', ...D.cal.map((x) => `${x.c.code} ${sh(x.c)}`), M === 'p1' ? '' : 'GPA', 'เวลาเรียนเฉลี่ย %', ...ACTS, 'มส.', 'ร']
+  const data = rows.map((r) => [r.s.no, r.s.name, ...r.cells.map((c) => (c === '' ? '' : (typeof c === 'number' ? c : String(c)))), r.gpa == null ? '' : Math.round(r.gpa * 100) / 100, r.att == null ? '' : Math.round(r.att * 10) / 10, ...r.acts, r.ms, r.ro])
+  saveFile(sumName(L, 'xlsx'), buildXlsx([{ name: `${L} ภาค ${S.term}`, head: 2, widths: [8, 30, ...D.cal.map(() => 16), 8, 12, ...ACTS.map(() => 14), 6, 6], rows: [[`สรุปผลการเรียนรายห้อง ${L} ภาคเรียนที่ ${D.T} ปีการศึกษา ${S.year} (${SUM_NOTE[M]})`], head, ...data] }]))
+}
+
 /* ---------- ดาวน์โหลด / พิมพ์ ---------- */
 const WORD_NS = 'xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"'
 function pageDoc(title, inner, word) {
@@ -481,11 +542,17 @@ function saveBlob(name, mime, text) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000)
 }
 function bookPages() { return [...document.querySelectorAll('#view .pg')].map((e) => e.outerHTML).join('') }
-function sheetHtml(c) {
+function sheetXlsx(c) {
   const cfg = cfgOf(c.code), R = calc(c.code), pri = isPri(c.level), t2 = pri && S.term === 2, F = fulls(c.code)
   const th = ['เลขที่', 'ชื่อ-สกุล', ...cfg.cols.map((k) => `${k.n} (${k.max})`), 'รวมระหว่างภาค', `ปลายภาค (${F.fin})`, 'ชั่วโมงที่ขาด', 'เวลาเรียน %'].concat(pri ? (t2 ? ['ภาคเรียน 1 (50)', 'ภาคเรียน 2 (50)', 'รวมทั้งปี', 'เกรด'] : ['ภาคเรียน 1 (50)']) : ['รวม', 'เกรด'])
-  const rows = R.map((r) => [r.s.no, r.s.name, ...cfg.cols.map((k, i) => r.v.c[i] ?? ''), f1(r.mid), r.v.f ?? '', r.a[S.term] > 0 ? r.a[S.term] : 0, r.pct == null ? '-' : f1(r.pct)].concat(pri ? (t2 ? [f1(r.pr), f1(r.cur), f1(r.sum), r.g ?? '-'] : [f1(r.cur)]) : [f1(r.tot), r.g ?? '-']))
-  return `<html><head><meta charset="utf-8"></head><body><table border="1"><tr><td colspan="${th.length}"><b>${esc(c.code)} ${esc(c.name)} ${c.level} ปีการศึกษา ${S.year} ${isPri(c.level) ? '' : 'ภาคเรียนที่ ' + S.term}</b></td></tr><tr>${th.map((x) => `<th>${esc(x)}</th>`).join('')}</tr>${rows.map((r) => `<tr>${r.map((x) => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</table></body></html>`
+  const n = (x) => (x == null || x === '' ? '' : Math.round(x * 10) / 10)
+  const rows = R.map((r) => [r.s.no, r.s.name, ...cfg.cols.map((k, i) => (r.v.c[i] === '' || r.v.c[i] == null ? '' : +r.v.c[i])), n(r.mid), r.v.f === '' || r.v.f == null ? '' : +r.v.f, r.a[S.term] > 0 ? r.a[S.term] : 0, n(r.pct)].concat(pri ? (t2 ? [n(r.pr), n(r.cur), n(r.sum), r.g ?? ''] : [n(r.cur)]) : [n(r.tot), r.g ?? '']))
+  return buildXlsx([{ name: c.code, head: 2, widths: [8, 30, ...th.slice(2).map(() => 14)], rows: [[`${c.code} ${c.name} ${c.level} ปีการศึกษา ${S.year} ${pri ? '' : 'ภาคเรียนที่ ' + S.term}`], th, ...rows] }])
+}
+function saveFile(name, blob) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000)
 }
 function downloadBook(f) {
   const c = CAT.find((x) => x.code === S.scCode)
@@ -494,7 +561,7 @@ function downloadBook(f) {
   if ((!pri || S.term === 2) && evMiss(c.code, S.term, R)) return toast('ยังประเมินผู้เรียนไม่ครบ ดาวน์โหลดไม่ได้')
   if (f === 'PDF') printPages(fname(c, 'pdf').replace(/\.pdf$/, ''), bookPages())
   else if (f === 'Word') saveBlob(fname(c, 'doc'), 'application/msword', pageDoc(fname(c, 'doc'), bookPages(), true))
-  else saveBlob(fname(c, 'xls'), 'application/vnd.ms-excel', sheetHtml(c))
+  else saveFile(fname(c, 'xlsx'), sheetXlsx(c))
 }
 function downloadReport(which) {
   const L = S.rpLevel || 'ป.3', D = rptData(L), s = D.stus.find((x) => x.id === S.rpStu) || D.stus[0]
@@ -505,11 +572,12 @@ function downloadReport(which) {
 
 /* ---------- ตัวจัดการเหตุการณ์หลัก ---------- */
 reg('click', (e) => {
-  const t = e.target.closest('[data-go],[data-term],[data-actlv],[data-mem],[data-act],[data-hr],[data-clublv]')
+  const t = e.target.closest('[data-go],[data-term],[data-actlv],[data-mem],[data-act],[data-hr],[data-clublv],[data-sumlv]')
   if (!t || !$('#view') || !$('#view').contains(t)) return
   const d = t.dataset
   if (d.go) { const [pg, cd] = d.go.split('@'); if (cd) S.scCode = cd; CTX.go(pg); return }
   if (d.term) { CTX.setTerm(+d.term); return }
+  if (d.sumlv) { S.sumLv = d.sumlv; render(); return }
   if (d.actlv) { S.actLevel = d.actlv; render(); return }
   if (d.clublv) { S.clubLv = d.clublv; render(); return }
   if (d.hr) { const a = (HOMEROOM[d.hr] = HOMEROOM[d.hr] || []), i = a.indexOf(d.uid); if (i < 0) { if (a.length >= 2) return toast('ที่ปรึกษาห้องละไม่เกิน 2 คน'); a.push(d.uid) } else a.splice(i, 1); render(); return }
@@ -524,6 +592,7 @@ reg('click', (e) => {
   else if (a === 'delcol') { cfgOf(S.scCode).cols.splice(+d.i, 1); render() }
   else if (a === 'dl') downloadBook(d.f)
   else if (a === 'rdl') downloadReport(d.w)
+  else if (a === 'sumdl') downloadSummary(d.f)
 })
 reg('change', (e) => {
   const t = e.target
@@ -549,7 +618,11 @@ reg('change', (e) => {
 function claim(key) {
   const st = S.acts[key]; if (isAdmin()) return true
   if (st.owner && st.owner !== S.role) { toast('ครูอีกคนกรอกกิจกรรมนี้แล้ว'); return false }
-  if (!st.owner) st.owner = S.role
+  if (!st.owner) {
+    st.owner = S.role
+    const L = key.split('|')[0]
+    ;(HOMEROOM[L] || []).filter((h) => h !== S.role).forEach((h) => notify(h, `${me().name} กรอกกิจกรรม ${key.replace('|', ' ')} ของห้องแล้ว คุณกรอกซ้ำไม่ได้`, 'acts'))
+  }
   return true
 }
 
@@ -577,6 +650,7 @@ const timers = {}
 let unsubs = []
 const docId = (b, sub) => `${S.year}~${b}~${encodeURIComponent(sub).replace(/\./g, '%2E')}`
 function cleaned(b, d) {
+  if (b === 'cfg' && d.cols && d.cols.length === 1 && d.cols[0].n === 'คะแนนเก็บระหว่างภาค' && d.scale === 100 && d.hours === 40 && !d.ratio) return {}
   if (b === 'scores') { const o = {}; for (const [k, v] of Object.entries(d)) if ((v.c || []).some((x) => x !== '' && x != null) || (v.f !== '' && v.f != null)) o[k] = v; return o }
   if (b === 'ab') { const o = {}; for (const [k, v] of Object.entries(d)) if (Object.values(v).some((x) => +x > 0)) o[k] = v; return o }
   return d
@@ -605,7 +679,7 @@ function flush(id) {
   setDoc(doc(db, 'work', id), { year: S.year, bucket: b, sub, json: j, by: S.role, at: Date.now() })
     .then(() => { if (pending[id] === j) delete pending[id] }).catch(report)
 }
-function report(err) { console.error(err); toast('บันทึกไม่สำเร็จ: ' + (err.code === 'permission-denied' ? 'ไม่มีสิทธิ์' : err.message)) }
+function report(err) { console.error(err); toast('บันทึกไม่สำเร็จ: ' + (err.code === 'permission-denied' ? 'ไม่มีสิทธิ์แก้ข้อมูลส่วนนี้' : err.message)) }
 let lastSettings = null
 function settingsJson() { return JSON.stringify({ school: S.school, homeroom: HOMEROOM, guidance: S.guidance, names: NAMES }) }
 function persistSettings() {

@@ -13,6 +13,7 @@ import Students from './pages/Students'
 import Catalog from './pages/Catalog'
 import Registration from './pages/Registration'
 import EnginePage from './pages/EnginePage'
+import Bell from './components/Bell'
 import { engineStop } from './engine/engine'
 
 // เมนูทั้งหมด: [path, ชื่อเต็ม, ชื่อสั้น (แถบล่างบนจอเล็ก), ไอคอน, บทบาทที่เห็น]
@@ -31,6 +32,7 @@ const PAGES = [
   ['/eval', 'ประเมินผู้เรียน', 'ประเมิน', 'star', ALL, E('eval')],
   ['/p5', 'สมุด ปพ.5', 'ปพ.5', 'print', ALL, E('p5')],
   ['/report', 'ใบแจ้งผลการเรียน', 'แจ้งผล', 'book', ALL, E('report')],
+  ['/summary', 'สรุปผลรายห้อง', 'สรุปห้อง', 'book', ALL, E('summary')],
   ['/school', 'ตั้งค่าโรงเรียน', 'โรงเรียน', 'school', ADMIN, E('school')],
   ['/sign', 'ลายเซ็นของฉัน', 'ลายเซ็น', 'pen', ALL, E('sign')],
   ['/guide', 'คู่มือการใช้งาน', 'คู่มือ', 'help', ALL, E('guide')],
@@ -95,6 +97,7 @@ function Shell() {
             {[1, 2].map((t) => (
               <button key={t} className="chip" aria-pressed={term === t} onClick={() => setTerm(t)}>ภาคเรียนที่ {t}</button>
             ))}
+            <Bell />
             <span className="small muted">{user.name} ({ROLE_LABEL[user.role]})</span>
             <button className="btn alt sm" onClick={logout}>ออกจากระบบ</button>
           </div>
