@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { useData } from '../data'
@@ -5,7 +6,8 @@ import { useRegs } from '../lib/useRegs'
 import { isAdminRole } from '../lib/constants'
 
 export default function Home() {
-  const { user } = useAuth()
+  const { user, linkGoogle, googleLinked } = useAuth()
+  const [gmsg, setGmsg] = useState('')
   const { openYear, term, activeStudents, catalog, openSet } = useData()
   const regs = useRegs()
   const nav = useNavigate()
@@ -15,8 +17,28 @@ export default function Home() {
   const approved = mine.filter((r) => r.status === 'ok').reduce((n, r) => n + r.codes.length, 0)
   const back = mine.filter((r) => r.status === 'back')
 
+  const link = async () => {
+    setGmsg('')
+    try { await linkGoogle(); setGmsg('ผูกบัญชี Google แล้ว ครั้งต่อไปกด "เข้าสู่ระบบด้วย Google" ได้เลย') }
+    catch (e) { setGmsg(e.code === 'auth/credential-already-in-use' ? 'บัญชี Google นี้ถูกผูกกับผู้ใช้อื่นแล้ว' : e.code === 'auth/popup-closed-by-user' ? '' : 'ผูกไม่สำเร็จ: ' + (e.code || e.message)) }
+  }
+  const googleCard = (
+    <>
+      {admin && !googleLinked && (
+        <div className="card row" style={{ marginBottom: 14, justifyContent: 'space-between' }}>
+          <span className="small">ผูกบัญชี Google เพื่อเข้าสู่ระบบโดยไม่ต้องพิมพ์อีเมลและรหัสผ่าน</span>
+          <button className="btn sm" onClick={link}>ผูกบัญชี Google</button>
+          {gmsg && <span className="small" style={{ flexBasis: '100%' }}>{gmsg}</span>}
+        </div>
+      )}
+      {admin && googleLinked && gmsg && <div className="notice" style={{ marginBottom: 14 }}>{gmsg}</div>}
+    </>
+  )
+
   if (!openYear) {
     return (
+      <>
+      {googleCard}
       <div className="card stack">
         <h3>ยังไม่มีปีการศึกษาที่เปิดใช้งาน</h3>
         <p className="muted" style={{ margin: 0 }}>
@@ -24,11 +46,13 @@ export default function Home() {
         </p>
         {user.role === 'superadmin' && <div><button className="btn" onClick={() => nav('/years')}>ไปที่ปีการศึกษา</button></div>}
       </div>
+      </>
     )
   }
 
   return (
     <>
+      {googleCard}
       <div className="grid">
         <div className="card kpi"><b>{activeStudents.length}</b>นักเรียนที่กำลังเรียน</div>
         <div className="card kpi"><b>{openSet.size}</b>รายวิชาที่เปิดสอน (จาก {catalog.length})</div>

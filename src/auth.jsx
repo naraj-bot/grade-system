@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import {
-  onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
+  GoogleAuthProvider, linkWithPopup, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, updatePassword,
 } from 'firebase/auth'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { auth, db, usernameToEmail } from './firebase'
@@ -25,6 +25,24 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(auth)
 
+  // เข้าสู่ระบบด้วย Google: ใช้ได้เฉพาะบัญชี Google ที่ผูกกับโปรไฟล์ไว้แล้ว (ผูกจากหน้าแรกหลังล็อกอินปกติ)
+  const loginGoogle = async () => {
+    const cred = await signInWithPopup(auth, new GoogleAuthProvider())
+    const snap = await getDoc(doc(db, 'users', cred.user.uid))
+    if (!snap.exists() || snap.data().active === false) {
+      await signOut(auth)
+      throw new Error('NOT_LINKED')
+    }
+  }
+  const [googleLinked, setGoogleLinked] = useState(false)
+  useEffect(() => {
+    setGoogleLinked(!!auth.currentUser?.providerData.some((p) => p.providerId === 'google.com'))
+  }, [user])
+  const linkGoogle = async () => {
+    await linkWithPopup(auth.currentUser, new GoogleAuthProvider())
+    setGoogleLinked(true)
+  }
+
   // บังคับเปลี่ยนรหัสครั้งแรก
   const changePassword = async (newPassword) => {
     await updatePassword(auth.currentUser, newPassword)
@@ -33,7 +51,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <Ctx.Provider value={{ user, loading, login, logout, changePassword }}>
+    <Ctx.Provider value={{ user, loading, login, logout, changePassword, loginGoogle, linkGoogle, googleLinked }}>
       {children}
     </Ctx.Provider>
   )

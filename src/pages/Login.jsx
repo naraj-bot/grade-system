@@ -3,8 +3,10 @@ import { useAuth } from '../auth'
 
 // กล่องเข้าสู่ระบบ (เปิดจากปุ่มในหน้าแรก)
 export default function Login({ onClose }) {
-  const { login } = useAuth()
-  const [username, setUsername] = useState('')
+  const { login, loginGoogle } = useAuth()
+  const saved = (() => { try { return localStorage.getItem('lastUser') || '' } catch { return '' } })()
+  const [username, setUsername] = useState(saved)
+  const [remember, setRemember] = useState(true)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -12,6 +14,7 @@ export default function Login({ onClose }) {
 
   useEffect(() => {
     ref.current?.focus()
+    if (ref.current && ref.current.value) document.getElementById('lgpw')?.focus()
     const esc = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
@@ -22,11 +25,22 @@ export default function Login({ onClose }) {
     setError(''); setBusy(true)
     try {
       await login(username, password)
+      try { remember ? localStorage.setItem('lastUser', username.trim()) : localStorage.removeItem('lastUser') } catch { /* ไม่เป็นไร */ }
     } catch {
       setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
     } finally {
       setBusy(false)
     }
+  }
+
+  const google = async () => {
+    setError(''); setBusy(true)
+    try {
+      await loginGoogle()
+    } catch (e) {
+      if (e.message === 'NOT_LINKED') setError('บัญชี Google นี้ยังไม่ได้ผูกกับผู้ใช้ในระบบ ให้เข้าด้วยอีเมล/รหัสผ่านก่อน แล้วกด "ผูกบัญชี Google" ที่หน้าแรก')
+      else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') setError('เข้าสู่ระบบด้วย Google ไม่สำเร็จ (' + (e.code || e.message) + ')')
+    } finally { setBusy(false) }
   }
 
   return (
@@ -40,10 +54,14 @@ export default function Login({ onClose }) {
           <input ref={ref} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
         </label>
         <label>รหัสผ่าน
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          <input id="lgpw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+        </label>
+        <label className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type="checkbox" style={{ width: 'auto' }} checked={remember} onChange={(e) => setRemember(e.target.checked)} /> จำชื่อผู้ใช้ไว้ในเครื่องนี้
         </label>
         {error && <div className="small" style={{ color: 'var(--bad)' }}>{error}</div>}
         <button className="btn" disabled={busy}>{busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>
+        <button type="button" className="btn alt" disabled={busy} onClick={google}>เข้าสู่ระบบด้วย Google (แอดมินที่ผูกบัญชีแล้ว)</button>
         <div className="small muted">เข้าครั้งแรกต้องเปลี่ยนรหัสผ่านก่อนใช้งาน · ลืมรหัสผ่านให้ติดต่อแอดมินหลัก</div>
       </form>
     </div>
