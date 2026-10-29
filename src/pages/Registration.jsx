@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { useAuth } from '../auth'
@@ -56,13 +56,19 @@ function AdminView({ regs }) {
 function TeacherView({ regs }) {
   const { user } = useAuth()
   const { openYear, term, termCatalog, catalog, openSet } = useData()
-  const mine = regs.find((r) => r.term === term)
+  const admin = isAdminRole(user.role)
+  const mine = regs.find((r) => r.term === term && r.uid === user.uid)
   const [levels, setLevels] = useState(() => new Set(mine ? mine.codes.map((c) => catalog.find((x) => x.code === c)?.level).filter(Boolean) : []))
   const [picked, setPicked] = useState(() => new Set(mine ? mine.codes : []))
   const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (!mine) return
+    setPicked(new Set(mine.codes))
+    setLevels(new Set(mine.codes.map((c) => catalog.find((x) => x.code === c)?.level).filter(Boolean)))
+  }, [mine?.updatedAt, mine?.status])
   const toggle = (set, setter, v) => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); setter(n) }
   const subj = termCatalog.filter((c) => levels.has(c.level) && openSet.has(c.code))
-  const locked = mine?.status === 'ok'
+  const locked = !admin && mine?.status === 'ok'
 
   const submit = async () => {
     if (!picked.size) return alert('เลือกวิชาที่สอนอย่างน้อย 1 วิชา')
@@ -70,7 +76,7 @@ function TeacherView({ regs }) {
     try {
       await setDoc(doc(db, 'registrations', `${openYear.year}_${term}_${user.uid}`), {
         year: openYear.year, term, uid: user.uid, name: user.name,
-        codes: [...picked], status: 'pending', msg: '', updatedAt: Date.now(),
+        codes: [...picked], status: admin ? 'ok' : 'pending', msg: '', updatedAt: Date.now(),
       })
     } finally { setBusy(false) }
   }
@@ -80,7 +86,7 @@ function TeacherView({ regs }) {
       {mine && (
         <div className="card stack">
           <div className="row" style={{ justifyContent: 'space-between' }}>
-            <b>การลงทะเบียนของคุณ (ภาคเรียนที่ {term})</b><span className={`pill ${pillOf(mine.status)}`}>{REG_STATUS[mine.status]}</span>
+            <b>{admin ? 'วิชาที่ฉันสอน' : 'การลงทะเบียนของคุณ'} (ภาคเรียนที่ {term})</b><span className={`pill ${pillOf(mine.status)}`}>{REG_STATUS[mine.status]}</span>
           </div>
           <Codes codes={mine.codes} catalog={catalog} />
           {mine.msg && <div className="lock small">ข้อความจากแอดมิน: {mine.msg}</div>}
@@ -109,7 +115,7 @@ function TeacherView({ regs }) {
               </tbody>
             </table>
           </div>
-          <div className="row"><button className="btn" disabled={busy} onClick={submit}>ส่งให้แอดมินอนุมัติ ({picked.size} วิชา)</button></div>
+          <div className="row"><button className="btn" disabled={busy} onClick={submit}>{admin ? `บันทึกวิชาที่ฉันสอน (${picked.size} วิชา)` : `ส่งให้แอดมินอนุมัติ (${picked.size} วิชา)`}</button></div>
         </div>
       )}
     </div>
@@ -121,5 +127,13 @@ export default function Registration() {
   const { openYear } = useData()
   const regs = useRegs()
   if (!openYear) return <div className="card empty">ยังไม่มีปีการศึกษาที่เปิดใช้งาน</div>
-  return isAdminRole(user.role) ? <AdminView regs={regs} /> : <TeacherView regs={regs} />
+  if (!isAdminRole(user.role)) return <TeacherView regs={regs} />
+  return (
+    <div className="stack">
+      <div className="small muted">แอดมินที่สอนด้วย: เลือกวิชาของตัวเองด้านล่าง (อนุมัติให้เองทันที) ส่วนรายการอนุมัติของครูอยู่ถัดลงไป</div>
+      <TeacherView regs={regs} />
+      <h3>อนุมัติการลงทะเบียนของครู</h3>
+      <AdminView regs={regs.filter((r) => r.uid !== user.uid)} />
+    </div>
+  )
 }

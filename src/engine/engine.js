@@ -32,7 +32,7 @@ const S = {
   page: 'scores', term: 1, year: 0, role: '', scCode: null,
   scores: {}, cfg: {}, ab: {}, rs: {}, ev: {}, sign: {}, fix: {}, meta: {}, acts: {}, members: {}, rpt: {},
   sigs: {}, school: defaultSchool(), guidance: 'none', regs: [], openSubj: new Set(), notes: [],
-  evKind: 'a', actLevel: 'ป.3', rpLevel: 'ป.3', rpStu: null, clubLv: 'ป.3',
+  evKind: 'a', actLevel: 'ป.3', rpLevel: 'ป.3', rpStu: null, clubLv: 'ป.3', allSubj: false,
 }
 const BUCKETS = ['scores', 'cfg', 'ab', 'rs', 'ev', 'sign', 'fix', 'meta', 'acts', 'members', 'rpt']
 
@@ -54,7 +54,9 @@ const P = {}
 function grade(x){return x>=80?4:x>=75?3.5:x>=70?3:x>=65?2.5:x>=60?2:x>=55?1.5:x>=50?1:0;}
 const gp=g=>`<span class="pill ${g>=3?'p-good':g>=1?'p-gold':'p-bad'}">${g}</span>`;
 function evMiss(code,T,R){const st=S.ev[code+'|'+T]||{};return R.filter(r=>!EVK.every(([k,,,it])=>evOverall((st[r.s.id]||{})[k],it.length))).length;}
-function myCodes(){return [...new Set(isAdmin()?CAT.filter(c=>S.openSubj.has(c.code)&&(isPri(c.level)||c.term===S.term)).map(c=>c.code):S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return isPri(x.level)||x.term===S.term;}))];}
+function myCodes(){const own=()=>S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return x&&(isPri(x.level)||x.term===S.term);});
+  const mine=[...new Set(own())];if(isAdmin()&&!S.allSubj&&mine.length)return mine;
+  return [...new Set(isAdmin()?CAT.filter(c=>S.openSubj.has(c.code)&&(isPri(c.level)||c.term===S.term)).map(c=>c.code):S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return isPri(x.level)||x.term===S.term;}))];}
 const TK=(code,T)=>{T=T||S.term;const c=CAT.find(x=>x.code===code);return(c&&isPri(c.level)&&T===1)?code+'~1':code;};
 const uk=(T,l)=>(T===1&&isPri(CAT.find(x=>x.code===S.scCode).level))?'①'+l:l;
 function cfgOf(code,T){const k=TK(code,T);const f=S.cfg[k]||(S.cfg[k]={scale:100,cols:[{n:'คะแนนเก็บระหว่างภาค',max:0}]});if(!f.hours)f.hours=40;return f;}
@@ -79,7 +81,7 @@ function calc(code,T){T=T||S.term;const c=CAT.find(x=>x.code===code),pri=isPri(c
   return {s,v,a,mid,fin,tot,cur,pr,att,pct,sum,g,ms};});}
 const f1=x=>x==null?'-':(Math.round(x*10)/10).toString();
 function pickSubject(){const codes=myCodes();if(!codes.length)return null;if(!S.scCode||!codes.includes(S.scCode))S.scCode=codes[0];return codes;}
-function subjectSelect(codes,noRatio){return `<label for="sub">วิชา</label><select id="sub">${codes.map(k=>{const x=CAT.find(y=>y.code===k);return `<option value="${k}" ${k===S.scCode?'selected':''}>${x.level} ${k} ${esc(x.name)}</option>`}).join('')}</select>
+function subjectSelect(codes,noRatio){return `${isAdmin()?`<label class="small"><input type="checkbox" id="allsubj" ${S.allSubj?'checked':''}> แสดงทุกวิชาของโรงเรียน (ไม่ติ๊ก = เฉพาะวิชาที่ฉันสอน)</label>`:''}<label for="sub">วิชา</label><select id="sub">${codes.map(k=>{const x=CAT.find(y=>y.code===k);return `<option value="${k}" ${k===S.scCode?'selected':''}>${x.level} ${k} ${esc(x.name)}</option>`}).join('')}</select>
  ${noRatio?'':`<label for="rt">สัดส่วน</label><select id="rt">${['60:40','70:30','80:20'].map(x=>`<option ${x===(cfgOf(S.scCode).ratio||'70:30')?'selected':''}>${x}</option>`).join('')}</select>`}
  <div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${S.term===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>`;}
 P.scores=()=>{
@@ -526,7 +528,8 @@ reg('click', (e) => {
 reg('change', (e) => {
   const t = e.target
   if (!$('#view') || !$('#view').contains(t)) return
-  if (t.id === 'sub') { S.scCode = t.value; render() }
+  if (t.id === 'allsubj') { S.allSubj = t.checked; render() }
+  else if (t.id === 'sub') { S.scCode = t.value; render() }
   else if (t.id === 'rt') { cfgOf(S.scCode).ratio = t.value; render() }
   else if (t.id === 'gd') { S.guidance = t.value; render() }
   else if (t.id === 'hrs') { cfgOf(S.scCode).hours = Math.max(1, +t.value || 40); render() }
