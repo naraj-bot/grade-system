@@ -18,7 +18,7 @@ export default function Landing() {
         <div className="hero-in">
           <div className="hl">
             <div className="brand2">
-              <span className="bi"><img src="/logo.jpg" alt="ตราโรงเรียนวัดบางปูน" /></span>
+              <span className="bi"><img src="/logo.png" alt="ตราโรงเรียนวัดบางปูน" /></span>
               <div><b>ระบบตัดเกรด</b><small>SMART GRADE &amp; ปพ.5 · วัดบางปูน</small></div>
             </div>
             <h1>บันทึกคะแนน ตัดเกรด<br />ออกเล่ม ปพ.5 ในที่เดียว</h1>

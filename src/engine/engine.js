@@ -7,7 +7,7 @@ import { printCss } from './printcss'
 
 const $ = (s) => document.querySelector(s)
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-const LOGO = location.origin + '/logo.jpg'
+const LOGO = location.origin + '/logo.png'
 const LEVELS = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3']
 const isPri = (l) => l.startsWith('ป.')
 const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'sign', 'school', 'guide']

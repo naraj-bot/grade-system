@@ -55,7 +55,7 @@ function Shell() {
     <div className="app">
       <aside className="side">
         <div className="brand">
-          <div className="crest"><img src="/logo.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
+          <div className="crest"><img src="/logo.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
           <div><b>ระบบตัดเกรด</b><small>โรงเรียนวัดบางปูน</small></div>
         </div>
         <nav className="nav" aria-label="เมนูหลัก">
