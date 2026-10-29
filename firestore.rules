@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function role() { return me().role; }
+    function isSuper() { return signedIn() && role() == 'superadmin'; }
+    function isAdmin() { return signedIn() && (role() == 'superadmin' || role() == 'schooladmin'); }
+
+    // ผู้ใช้: อ่านโปรไฟล์ตนเองได้ แอดมินอ่านได้ทั้งหมด
+    // การสร้างบัญชี/รีเซ็ตรหัสทำผ่าน /api/users (Admin SDK) เท่านั้น
+    // ผู้ใช้แก้ได้เฉพาะ mustChangePassword ของตนเอง (เพื่อบังคับเปลี่ยนรหัสครั้งแรก)
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword']);
+      allow create, delete: if false;
+    }
+
+    // ปีการศึกษา/ภาคเรียน: ทุกคนที่ล็อกอินอ่านได้ แอดมินหลักเขียนได้
+    match /years/{year} {
+      allow read: if signedIn();
+      allow write: if isSuper();
+      match /terms/{term} {
+        allow read: if signedIn();
+        allow write: if isSuper();
+      }
+    }
+
+    // นักเรียน: ผู้ใช้ที่ล็อกอินอ่านได้ แอดมินเพิ่ม/แก้ไข ประวัติแก้ไขอ่าน/เพิ่มได้เฉพาะแอดมิน (ห้ามแก้/ลบ)
+    match /students/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+    match /studentLog/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // รายวิชาที่เปิดสอนในปีการศึกษา: แอดมินเปิด/ปิด
+    match /subjectOpen/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // ใบลงทะเบียนสอน: ครูสร้าง/แก้ของตนเองได้ขณะยังไม่อนุมัติ แอดมินอนุมัติ/ส่งกลับ
+    match /registrations/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid
+            && resource.data.status != 'ok'
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.status == 'pending');
+      allow delete: if isAdmin();
+    }
+
+    // ข้อมูลการทำงานรายปี (คะแนน ค่าตั้งวิชา เวลาเรียน ประเมิน กิจกรรม ปพ.5 ฯลฯ) id = ปี~หมวด~คีย์
+    // อ่าน/เขียนได้เมื่อล็อกอิน (ระยะต่อไปจะเข้มขึ้นให้เขียนได้เฉพาะครูที่ได้รับอนุมัติของวิชานั้น)
+    match /work/{id} {
+      allow read, write: if signedIn();
+    }
+    // ลายเซ็นอิเล็กทรอนิกส์: ทุกคนอ่านได้ (ใช้พิมพ์ในเล่ม) เจ้าของหรือแอดมินเขียน
+    match /sigs/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && (request.auth.uid == uid || isAdmin());
+    }
+    // ตั้งค่าโรงเรียน ครูที่ปรึกษา ผู้ลงนาม: ทุกคนอ่านได้ แอดมินแก้ได้
+    match /settings/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // ส่วนอื่น (นักเรียน รายวิชา คะแนน ฯลฯ) ปิดไว้ก่อน จะเพิ่มกฎในขั้นถัดไป
+    match /{document=**} { allow read, write: if false; }
+  }
+}
