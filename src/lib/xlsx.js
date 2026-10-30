@@ -6,11 +6,11 @@ const crc32 = (b) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
 const col = (i) => { let s = ''; for (i++; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s; return s }
 
-function zip(files) {
+export function zip(files, mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
   const parts = [], central = []; let off = 0
   const u16 = (v) => [v & 255, (v >> 8) & 255], u32 = (v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255]
   for (const [name, text] of files) {
-    const nb = enc.encode(name), data = enc.encode(text), crc = crc32(data)
+    const nb = enc.encode(name), data = typeof text === 'string' ? enc.encode(text) : text, crc = crc32(data)
     const lh = new Uint8Array([0x50, 0x4b, 3, 4, 20, 0, 0, 8, 0, 0, 0, 0, 0x21, 0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nb.length), 0, 0])
     parts.push(lh, nb, data)
     central.push(new Uint8Array([0x50, 0x4b, 1, 2, 20, 0, 20, 0, 0, 8, 0, 0, 0, 0, 0x21, 0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nb.length), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...u32(off)]), nb)
@@ -18,7 +18,7 @@ function zip(files) {
   }
   const csize = central.reduce((a, b) => a + b.length, 0)
   const end = new Uint8Array([0x50, 0x4b, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length), ...u32(csize), ...u32(off), 0, 0])
-  return new Blob([...parts, ...central, end], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  return new Blob([...parts, ...central, end], { type: mime })
 }
 
 export function buildXlsx(sheets) {
@@ -44,3 +44,4 @@ export function buildXlsx(sheets) {
   ]
   return zip(files)
 }
+

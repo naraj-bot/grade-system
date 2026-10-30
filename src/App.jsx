@@ -11,6 +11,7 @@ import Users from './pages/Users'
 import Home from './pages/Home'
 import Students from './pages/Students'
 import Catalog from './pages/Catalog'
+import Backup from './pages/Backup'
 import Registration from './pages/Registration'
 import EnginePage from './pages/EnginePage'
 import Bell from './components/Bell'
@@ -33,6 +34,7 @@ const PAGES = [
   ['/p5', 'สมุด ปพ.5', 'ปพ.5', 'print', ALL, E('p5')],
   ['/report', 'ใบแจ้งผลการเรียน', 'แจ้งผล', 'book', ALL, E('report')],
   ['/summary', 'สรุปผลรายห้อง', 'สรุปห้อง', 'book', ALL, E('summary')],
+  ['/backup', 'สำรองข้อมูล', 'สำรอง', 'down', ADMIN, Backup],
   ['/school', 'ตั้งค่าโรงเรียน', 'โรงเรียน', 'school', ADMIN, E('school')],
   ['/sign', 'ลายเซ็นของฉัน', 'ลายเซ็น', 'pen', ALL, E('sign')],
   ['/guide', 'คู่มือการใช้งาน', 'คู่มือ', 'help', ALL, E('guide')],

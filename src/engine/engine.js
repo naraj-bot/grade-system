@@ -2,9 +2,10 @@
 // เอนจินกรอกคะแนน/ประเมิน/กิจกรรม/ปพ.5/ใบแจ้งผล — ย้ายจากต้นแบบที่ทดสอบแล้ว
 // ผูกกับ Firestore: work/{ปี~หมวด~คีย์}, sigs/{uid}, settings/school
 import { collection, deleteDoc, doc, onSnapshot, query, setDoc, where } from 'firebase/firestore'
-import { db } from '../firebase'
+import { auth, db } from '../firebase'
 import { printCss } from './printcss'
 import { buildXlsx } from '../lib/xlsx'
+import { htmlToDocx } from '../lib/docx'
 
 const $ = (s) => document.querySelector(s)
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -516,7 +517,7 @@ P.summary = () => {
 function sumName(L, ext) { return `สรุปผลการเรียน_${L}_ภาคเรียน${S.term}_ปีการศึกษา${S.year}.${ext}`.replace(/[\\/:*?"<>|]/g, '') }
 function downloadSummary(f) {
   const L = S.sumLv, { D, rows, M } = sumData(L)
-  if (f === 'PDF') return printPages(sumName(L, 'pdf').replace(/\.pdf$/, ''), sumPage(L))
+  if (f === 'PDF') return exportPdf(sumName(L, 'pdf').replace(/\.pdf$/, ''), sumPage(L))
   const sh = (c) => c.name.replace(/\s+\d+$/, '')
   const head = ['เลขที่', 'ชื่อ-สกุล', ...D.cal.map((x) => `${x.c.code} ${sh(x.c)}`), M === 'p1' ? '' : 'GPA', 'เวลาเรียนเฉลี่ย %', ...ACTS, 'มส.', 'ร']
   const data = rows.map((r) => [r.s.no, r.s.name, ...r.cells.map((c) => (c === '' ? '' : (typeof c === 'number' ? c : String(c)))), r.gpa == null ? '' : Math.round(r.gpa * 100) / 100, r.att == null ? '' : Math.round(r.att * 10) / 10, ...r.acts, r.ms, r.ro])
@@ -541,6 +542,26 @@ function saveBlob(name, mime, text) {
   a.download = name; document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(a.href), 4000)
 }
+// PDF: คอม/โน้ตบุ๊กใช้หน้าต่างพิมพ์ของเบราว์เซอร์ ส่วนไอแพด/มือถือให้เซิร์ฟเวอร์สร้างไฟล์ PDF ให้ดาวน์โหลดตรง ๆ
+const isTouchDevice = () => /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform))
+let forcePrint = false
+async function exportPdf(title, inner) {
+  if (!isTouchDevice() || forcePrint) { forcePrint = false; return printPages(title, inner) }
+  const html = pageDoc(title, inner)
+  if (html.length > 3800000) { forcePrint = true; return toast('ไฟล์ใหญ่เกินไปสำหรับสร้างบนเซิร์ฟเวอร์ กดปุ่ม PDF อีกครั้งเพื่อใช้วิธีพิมพ์') }
+  toast('กำลังสร้างไฟล์ PDF…')
+  try {
+    const token = await auth.currentUser.getIdToken()
+    const r = await fetch('/api/pdf', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ html }) })
+    if (!r.ok) throw new Error('status ' + r.status)
+    saveFile(title + '.pdf', await r.blob())
+    toast('สร้างไฟล์ PDF แล้ว')
+  } catch (err) {
+    console.error(err)
+    forcePrint = true
+    toast('สร้าง PDF บนเซิร์ฟเวอร์ไม่สำเร็จ กดปุ่ม PDF อีกครั้งเพื่อใช้วิธีพิมพ์แทน')
+  }
+}
 function bookPages() { return [...document.querySelectorAll('#view .pg')].map((e) => e.outerHTML).join('') }
 function sheetXlsx(c) {
   const cfg = cfgOf(c.code), R = calc(c.code), pri = isPri(c.level), t2 = pri && S.term === 2, F = fulls(c.code)
@@ -559,15 +580,22 @@ function downloadBook(f) {
   if (!c) return
   const R = calc(c.code), pri = isPri(c.level)
   if ((!pri || S.term === 2) && evMiss(c.code, S.term, R)) return toast('ยังประเมินผู้เรียนไม่ครบ ดาวน์โหลดไม่ได้')
-  if (f === 'PDF') printPages(fname(c, 'pdf').replace(/\.pdf$/, ''), bookPages())
-  else if (f === 'Word') saveBlob(fname(c, 'doc'), 'application/msword', pageDoc(fname(c, 'doc'), bookPages(), true))
+  if (f === 'PDF') exportPdf(fname(c, 'pdf').replace(/\.pdf$/, ''), bookPages())
+  else if (f === 'Word') wordBook(c)
   else saveFile(fname(c, 'xlsx'), sheetXlsx(c))
+}
+// Word (.docx จริง): แปลงหน้า ปพ.5 เป็นตาราง/ย่อหน้าของ Word (ฟอนต์ TH SarabunPSK ต้องมีในเครื่องที่เปิดไฟล์)
+async function wordBook(c) {
+  try {
+    toast('กำลังสร้างไฟล์ Word...')
+    saveFile(fname(c, 'docx'), await htmlToDocx(pageDoc(fname(c, 'docx'), bookPages(), true)))
+  } catch (e) { console.error(e); toast('สร้างไฟล์ Word ไม่สำเร็จ') }
 }
 function downloadReport(which) {
   const L = S.rpLevel || 'ป.3', D = rptData(L), s = D.stus.find((x) => x.id === S.rpStu) || D.stus[0]
   if (!s) return
-  if (which === 'all') printPages(rname(L, null, D.T).replace(/\.pdf$/, ''), D.stus.map((x) => rptPage(L, x, D)).join(''))
-  else printPages(rname(L, s, D.T).replace(/\.pdf$/, ''), rptPage(L, s, D))
+  if (which === 'all') exportPdf(rname(L, null, D.T).replace(/\.pdf$/, ''), D.stus.map((x) => rptPage(L, x, D)).join(''))
+  else exportPdf(rname(L, s, D.T).replace(/\.pdf$/, ''), rptPage(L, s, D))
 }
 
 /* ---------- ตัวจัดการเหตุการณ์หลัก ---------- */

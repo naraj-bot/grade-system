@@ -11,6 +11,9 @@ export default function Login({ onClose }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const ref = useRef(null)
+  // ปุ่ม Google ซ่อนไว้ แสดงเมื่อเปิดลิงก์ ...#admin หรือแตะโลโก้ 5 ครั้ง
+  const [taps, setTaps] = useState(0)
+  const showG = taps >= 5 || (typeof location !== 'undefined' && location.hash === '#admin')
 
   useEffect(() => {
     ref.current?.focus()
@@ -47,10 +50,13 @@ export default function Login({ onClose }) {
     <div className="lgov" role="dialog" aria-modal="true" aria-label="เข้าสู่ระบบ" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <form className="card" onSubmit={submit}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h2 style={{ margin: 0 }}>เข้าสู่ระบบ</h2>
+          <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+            <img src="/logo.png" alt="" onClick={() => setTaps((n) => n + 1)} style={{ height: 44, width: 'auto', cursor: 'default', userSelect: 'none', WebkitUserDrag: 'none' }} draggable={false} />
+            <h2 style={{ margin: 0 }}>เข้าสู่ระบบ</h2>
+          </div>
           <button type="button" className="btn sm alt" onClick={onClose} aria-label="ปิด">ปิด</button>
         </div>
-        <label>ชื่อผู้ใช้ (แอดมินหลักใช้อีเมล)
+        <label>ชื่อผู้ใช้
           <input ref={ref} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
         </label>
         <label>รหัสผ่าน
@@ -61,8 +67,8 @@ export default function Login({ onClose }) {
         </label>
         {error && <div className="small" style={{ color: 'var(--bad)' }}>{error}</div>}
         <button className="btn" disabled={busy}>{busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>
-        <button type="button" className="btn alt" disabled={busy} onClick={google}>เข้าสู่ระบบด้วย Google (แอดมินที่ผูกบัญชีแล้ว)</button>
-        <div className="small muted">เข้าครั้งแรกต้องเปลี่ยนรหัสผ่านก่อนใช้งาน · ลืมรหัสผ่านให้ติดต่อแอดมินหลัก</div>
+        {showG && <button type="button" className="btn alt" disabled={busy} onClick={google}>เข้าสู่ระบบด้วย Google</button>}
+        <div className="small muted">เข้าครั้งแรกต้องเปลี่ยนรหัสผ่านก่อนใช้งาน · ลืมรหัสผ่านให้ติดต่อผู้ดูแลระบบของโรงเรียน</div>
       </form>
     </div>
   )
