@@ -10,6 +10,7 @@ body{font-size:15pt;line-height:1.2}
 .pg{display:block!important;border:0!important;outline:0!important;padding:0!important;max-width:none!important;width:auto!important;margin:0!important;break-after:page;font-size:15pt!important}
 .pg:last-child{break-after:auto}
 .pg.land{page:land}
+.att{table-layout:fixed}.att td{overflow:hidden;white-space:nowrap}.att th,.att td{font-size:11.5pt!important;padding:0 2px!important;line-height:1.15}.att td.num{min-width:18px}
 .pg>*{margin:0 0 7px}
 .pg h3{font-size:19pt!important;margin:2px 0 8px;font-weight:700}
 .tw{overflow:visible!important;border:0!important;border-radius:0!important}

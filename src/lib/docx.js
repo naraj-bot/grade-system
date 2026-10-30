@@ -15,11 +15,11 @@ const hex = (css) => {
 
 export async function htmlToDocx(html) {
   const fr = document.createElement('iframe')
-  fr.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1123px;border:0;visibility:hidden'
+  fr.style.cssText = 'position:fixed;left:-9999px;top:0;width:1123px;height:1123px;border:0;visibility:hidden'
   document.body.appendChild(fr)
   try {
     const d = fr.contentDocument
-    d.open(); d.write(html.replace('</head>', '<style>html,body{margin:0!important}body{padding:0 14mm!important}</style></head>')); d.close()
+    d.open(); d.write(html.replace('</head>', '<style>html,body{margin:0!important}body{padding:0!important}.pg{width:688px!important;margin:0!important}.pg.land{width:1033px!important}</style></head>')); d.close()
     await new Promise((ok) => { if (d.readyState === 'complete') ok(); else fr.onload = () => ok(); setTimeout(ok, 4000) })
     try { await d.fonts.ready } catch { /* ไม่เป็นไร */ }
     return await build(d, fr.contentWindow)
@@ -182,7 +182,8 @@ async function build(d, w) {
     const tcw = t.getBoundingClientRect().width * TW
     for (let i = 0; i < ncol; i++) if (!colW[i]) colW[i] = Math.round(avg)
     const sum = colW.reduce((a, b) => a + b, 0)
-    if (sum > 10400) colW.forEach((_, i) => { colW[i] = Math.floor(colW[i] * 10318 / sum) })
+    const cap = t.closest('.pg.land') ? 15478 : 10318
+    if (sum > cap + 82) colW.forEach((_, i) => { colW[i] = Math.floor(colW[i] * cap / sum) })
     const total = colW.reduce((a, b) => a + b, 0)
     const rowsXml = []
     const pend2 = []
@@ -213,11 +214,17 @@ async function build(d, w) {
 
   let body = ''
   const pages = [...d.querySelectorAll('.pg')]
+  const sectOf = (land) => land
+    ? '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="680" w:right="680" w:bottom="680" w:left="680" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>'
+    : '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="794" w:right="794" w:bottom="794" w:left="794" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>'
+  let prevLand = false
   pages.forEach((pg, i) => {
-    if (i > 0) body += emptyPara(true)
+    const land = pg.classList.contains('land')
+    if (i > 0) body += land !== prevLand ? `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/>${sectOf(prevLand)}</w:pPr></w:p>` : emptyPara(true)
     body += blocks(pg)
+    prevLand = land
   })
-  const sect = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="794" w:right="794" w:bottom="794" w:left="794" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>'
+  const sect = sectOf(prevLand)
   const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
   const types = `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="gif" ContentType="image/gif"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`
   const styles = `${X}<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${FONT}" w:hAnsi="${FONT}" w:cs="${FONT}" w:eastAsia="${FONT}"/><w:sz w:val="30"/><w:szCs w:val="30"/><w:lang w:val="th-TH" w:bidi="th-TH"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`

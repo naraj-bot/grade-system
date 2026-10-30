@@ -13,7 +13,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const LOGO = location.origin + '/logo.png'
 const LEVELS = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3']
 const isPri = (l) => l.startsWith('ป.')
-const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'summary', 'sign', 'school', 'guide']
+const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'summary', 'sign', 'school', 'guide', 'att']
 
 let CAT = []
 let STU = []
@@ -33,11 +33,11 @@ const defaultSchool = () => ({
 })
 const S = {
   page: 'scores', term: 1, year: 0, role: '', scCode: null,
-  scores: {}, cfg: {}, ab: {}, rs: {}, ev: {}, sign: {}, fix: {}, meta: {}, acts: {}, members: {}, rpt: {},
+  scores: {}, cfg: {}, ab: {}, rs: {}, ev: {}, sign: {}, fix: {}, meta: {}, acts: {}, members: {}, rpt: {}, att: {},
   sigs: {}, school: defaultSchool(), guidance: 'none', regs: [], openSubj: new Set(), notes: [],
   evKind: 'a', actLevel: 'ป.3', rpLevel: 'ป.3', rpStu: null, clubLv: 'ป.3', allSubj: false, sumLv: null,
 }
-const BUCKETS = ['scores', 'cfg', 'ab', 'rs', 'ev', 'sign', 'fix', 'meta', 'acts', 'members', 'rpt']
+const BUCKETS = ['scores', 'cfg', 'ab', 'rs', 'ev', 'sign', 'fix', 'meta', 'acts', 'members', 'rpt', 'att']
 
 const me = () => USERS[S.role]
 const isAdmin = () => me().kind !== 'teacher'
@@ -77,7 +77,7 @@ function calc(code,T){T=T||S.term;const c=CAT.find(x=>x.code===code),pri=isPri(c
   const mid=sumC(v),fin=(v.f===''||v.f==null)?null:+v.f,tot=(mid==null||fin==null)?null:mid+fin;
   const cur=tot==null?null:(pri&&F.base===100?tot/2:tot);const pr=(pri&&T===2)?(t1[s.id]??null):null;
   let att=null,pct=null;
-  const A=t=>{const x=+a[t];return x>0?Math.min((pri&&T===2&&t===1)?H1:H,x):0;};
+  const A=t=>{const HH=(pri&&T===2&&t===1)?H1:H,ab=attAbs(code,t,s.id);if(ab!=null)return Math.min(HH,ab);const x=+a[t];return x>0?Math.min(HH,x):0;};
   if(pri&&T===2){const hh=H1+H;att=hh-A(1)-A(2);pct=att/hh*100;}
   else{att=H-A(T);pct=att/H*100;}
   const ms=pct!=null&&pct<80;let sum=null,g=null;
@@ -90,15 +90,48 @@ function pickSubject(){const codes=myCodes();if(!codes.length)return null;if(!S.
 function subjectSelect(codes,noRatio){return `${isAdmin()?`<label class="small"><input type="checkbox" id="allsubj" ${S.allSubj?'checked':''}> แสดงทุกวิชาของโรงเรียน (ไม่ติ๊ก = เฉพาะวิชาที่ฉันสอน)</label>`:''}<label for="sub">วิชา</label><select id="sub">${codes.map(k=>{const x=CAT.find(y=>y.code===k);return `<option value="${k}" ${k===S.scCode?'selected':''}>${x.level} ${k} ${esc(x.name)}</option>`}).join('')}</select>
  ${noRatio?'':`<label for="rt">สัดส่วน</label><select id="rt">${['60:40','70:30','80:20'].map(x=>`<option ${x===(cfgOf(S.scCode).ratio||'70:30')?'selected':''}>${x}</option>`).join('')}</select>`}
  <div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${S.term===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>`;}
+
+/* ---------- เช็คชื่อรายวัน ---------- */
+const ATC=['','ข','ล','ป','ส','น'],ATN={'':'มา',ข:'ขาด',ล:'ลากิจ',ป:'ป่วย',ส:'สาย',น:'หนีเรียน'},ATABS='ขลปน';
+const attKey=(code,T)=>code+'|'+T;
+const attOf=(code,T)=>S.att[attKey(code,T)]||(S.att[attKey(code,T)]={days:[],m:{}});
+const attHas=(code,T)=>{const x=S.att[attKey(code,T)];return !!(x&&x.days&&x.days.length);};
+function attAbs(code,T,sid){const x=S.att[attKey(code,T)];if(!x||!x.days||!x.days.length)return null;const m=(x.m||{})[sid]||{};let n=0;x.days.forEach(d=>{const st=m[d.d];if(st&&ATABS.includes(st))n+=(+d.h>0?+d.h:1);});return n;}
+const isoD=dt=>dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+const dShort=iso=>{const q=iso.split('-');return (+q[2])+'/'+(+q[1]);};
+const MSHORT=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function attRender(){const w=document.querySelector('#view .tw'),l=w?w.scrollLeft:0,y=window.scrollY;render();const w2=document.querySelector('#view .tw');if(w2)w2.scrollLeft=l;window.scrollTo(0,y);}
+function attAddDays(list,h){const c=S.scCode,A=attOf(c,S.term),have=new Set(A.days.map(x=>x.d));let n=0;list.forEach(d=>{if(!have.has(d)){A.days.push({d,h});have.add(d);n++;}});A.days.sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);return n;}
+P.att=()=>{
+ const codes=pickSubject();
+ if(!codes)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
+ const c=CAT.find(x=>x.code===S.scCode),T=S.term,A=attOf(c.code,T),R=calc(c.code,T),H=cfgOf(c.code,T).hours,days=A.days;
+ const ids=new Set(R.map(r=>r.s.id));S.attS=(S.attS||[]).filter(i=>ids.has(i));S.attD=(S.attD||[]).filter(d=>days.some(x=>x.d===d));
+ const totH=days.reduce((p,x)=>p+(+x.h||1),0),ym=days.length?days[0].d.slice(0,4):String(new Date().getFullYear());
+ const head=days.map(x=>`<th class="atd"><label><input type="checkbox" data-ad="${x.d}" ${S.attD.includes(x.d)?'checked':''} aria-label="เลือกวันที่ ${dShort(x.d)}"><br><b>${dShort(x.d)}</b></label><div class="small muted">${x.h} ชม.</div></th>`).join('');
+ const rows=R.map(r=>{const m=A.m[r.s.id]||{},ab=attAbs(c.code,T,r.s.id)||0;
+  return `<tr><td class="num"><label><input type="checkbox" data-as="${r.s.id}" ${S.attS.includes(r.s.id)?'checked':''} aria-label="เลือก ${esc(r.s.name)}"> ${r.s.no}</label></td><td>${esc(r.s.name)}</td>${days.map(x=>{const st=m[x.d]||'';return `<td class="ac"><button class="astb as${st||'0'}" data-ac="${r.s.id}|${x.d}" title="${ATN[st]}" aria-label="${esc(r.s.name)} ${dShort(x.d)} ${ATN[st]}">${st||'/'}</button></td>`;}).join('')}<td class="num">${ab}</td><td class="num">${r.pct==null?'-':`<span class="pill ${r.ms?'p-bad':'p-good'}">${f1(r.pct)}%</span>`}</td></tr>`;}).join('');
+ return `<div class="stack"><div class="row">${subjectSelect(codes,1)}</div>
+ <div class="card stack"><h3>เช็คชื่อรายวัน</h3>
+  <div class="small muted">เพิ่มวันเรียนทีละวันหรือทั้งช่วง ทุกคนถือว่า “มาเรียน” อยู่แล้ว จึงบันทึกเฉพาะคนที่ขาด/ลา/ป่วย/สาย/หนีเรียน ระบบนับชั่วโมงที่ขาดเข้าเวลาเรียนและตัดเป็น มส. (ต่ำกว่าร้อยละ 80) ให้เอง และพิมพ์รวมเป็นหน้าแนวนอนใน ปพ.5</div>
+  <div class="row"><label for="attd">วันที่</label><input id="attd" type="date" value="${S.attLast||''}"><label for="atth">ชั่วโมง/วัน</label><input id="atth" type="number" min="1" max="8" value="${S.attH||1}" style="width:70px"><button class="btn sm" data-at="add">เพิ่มวันเรียน</button></div>
+  <details><summary class="small">เพิ่มทั้งช่วงวัน (ข้ามเสาร์-อาทิตย์ให้)</summary><div class="row" style="margin-top:8px"><label for="attf">ตั้งแต่</label><input id="attf" type="date"><label for="attt">ถึง</label><input id="attt" type="date"><label class="small"><input type="checkbox" id="attwe"> รวมเสาร์-อาทิตย์</label><button class="btn sm alt" data-at="range">เพิ่มทั้งช่วง</button></div><div class="small muted">วันหยุดที่ไม่ได้สอน ให้ติ๊กหัวคอลัมน์วันนั้นแล้วกด “ลบวันที่เลือก”</div></details>
+  <div class="row"><span class="pill ${days.length?'p-good':'p-warn'}">บันทึกแล้ว ${days.length} วัน · ${totH} ชม. (ตั้งไว้ทั้งภาคเรียน ${H} ชม.)</span>${days.length&&totH>H?`<span class="small" style="color:var(--bad)">ชั่วโมงที่บันทึกมากกว่าที่ตั้งไว้ ปรับได้ที่หน้ากรอกคะแนน</span>`:''}</div>
+ </div>
+ ${days.length?`<div class="card stack"><div class="row"><b>ลงสถานะ</b><select id="atss" aria-label="สถานะ">${ATC.map(k=>`<option value="${k}">${k?k+' = ':''}${ATN[k]}</option>`).join('')}</select><button class="btn sm" data-at="apply">ใช้กับที่เลือก</button><span class="small muted">ติ๊กหน้าชื่อ (หลายคนได้) และ/หรือหัวคอลัมน์วันที่ แล้วกดใช้ — ถ้าเลือกเฉพาะนักเรียน = ทุกวันของคนนั้น, เลือกเฉพาะวัน = ทุกคนในวันนั้น</span></div>
+  <div class="row"><button class="btn sm alt" data-at="selall">เลือกนักเรียนทั้งหมด</button><button class="btn sm alt" data-at="selnone">ล้างที่เลือก</button><button class="btn sm alt" data-at="allpresent">ทุกคนมาเรียนทุกวัน</button><button class="btn sm alt" style="color:var(--bad)" data-at="delday">ลบวันที่เลือก</button></div>
+  <div class="small muted">แตะช่องเพื่อเปลี่ยนทีละคน: / (มา) → ข → ล → ป → ส → น · ข=ขาด ล=ลากิจ ป=ลาป่วย ส=สาย (นับว่ามาเรียน) น=หนีเรียน</div></div>
+ <div class="tw"><table class="attm"><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th>${head}<th>ขาด (ชม.)</th><th>เวลาเรียน</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="card empty">ยังไม่มีวันเรียน เพิ่มวันที่ด้านบนเพื่อเริ่มเช็คชื่อ</div>'}</div>`;};
 P.scores=()=>{
  const codes=pickSubject();
  if(!codes)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
  const c=CAT.find(x=>x.code===S.scCode),pri=isPri(c.level),cfg=cfgOf(c.code),F=fulls(c.code),R=calc(c.code),t2=pri&&S.term===2;
+ if(!S.tpl&&!attHas(c.code,S.term))return `<div class="stack"><div class="row">${subjectSelect(codes)}</div><div class="card lock stack"><h3>ต้องเช็คชื่อก่อนจึงกรอกคะแนนได้</h3><div class="small">วิชา ${esc(c.name)} ภาคเรียนที่ ${S.term} ยังไม่มีการบันทึกวันเรียน เพิ่มวันเรียนในหน้าเช็คชื่อก่อน (ทุกคนเป็น “มา” อยู่แล้ว บันทึกเฉพาะคนขาด/ลา) แล้วกลับมากรอกคะแนนได้ทันที</div><div><button class="btn" data-go="att">ไปเช็คชื่อ</button></div></div></div>`;
  const sumMax=cfg.cols.reduce((p,q)=>p+(+q.max||0),0),ok=Math.abs(sumMax-F.mid)<1e-9,H=cfg.hours;
  const rows=R.map(r=>{
   const ins=cfg.cols.map((k,i)=>`<td><input type="number" min="0" max="${k.max}" data-sc="${r.s.id}" data-i="${i}" value="${r.v.c[i]==null?'':r.v.c[i]}" aria-label="${esc(k.n)} ${esc(r.s.name)}"></td>`).join('');
   const fin=`<td><input type="number" min="0" max="${F.fin}" data-sc="${r.s.id}" data-i="f" value="${r.v.f==null?'':r.v.f}" aria-label="ปลายภาค ${esc(r.s.name)}"></td>`;
-  const att=`<td><input type="number" min="0" max="${H}" data-ab="${r.s.id}" value="${r.a[S.term]>0?r.a[S.term]:''}" placeholder="0" aria-label="ชั่วโมงที่ขาด ${esc(r.s.name)}"></td><td class="num">${r.pct==null?'-':`<span class="pill ${r.ms?'p-bad':'p-good'}">${f1(r.pct)}%</span>`}</td>`;
+  const att=`<td><input type="number" min="0" max="${H}" data-ab="${r.s.id}" value="${attHas(c.code,S.term)?(attAbs(c.code,S.term,r.s.id)||''):(r.a[S.term]>0?r.a[S.term]:'')}" ${attHas(c.code,S.term)?'disabled title="คำนวณจากหน้าเช็คชื่อ"':''} placeholder="0" aria-label="ชั่วโมงที่ขาด ${esc(r.s.name)}"></td><td class="num">${r.pct==null?'-':`<span class="pill ${r.ms?'p-bad':'p-good'}">${f1(r.pct)}%</span>`}</td>`;
   let tail;
   if(!pri)tail=`<td class="num">${f1(r.tot)}</td><td>${r.g==null?'-':gp(r.g)}</td>`;
   else if(!t2)tail=`<td class="num">${f1(r.cur)} / 50</td><td class="muted small">${r.ms?'เวลาเรียนต่ำกว่าร้อยละ 80':'ยังไม่ตัดเกรด'}</td>`;
@@ -218,7 +251,27 @@ P.p5=()=>{
   <tr>${G.map(g=>g.idx.length>1?g.idx.map(i=>`<th>${cfg.cols[i].max}</th>`).join('')+`<th>${g.max}</th>`:`<th>${g.max}</th>`).join('')}</tr></thead><tbody>
   ${R.map(r=>`<tr>${stuCells(r)}${G.map(g=>g.idx.map(i=>`<td class="num">${r.v.c[i]==null||r.v.c[i]===''?'-':r.v.c[i]}</td>`).join('')+(g.idx.length>1?`<td class="num"><b>${f1(gsum(r,g))}</b></td>`:'')).join('')}${G.length>1?`<td class="num"><b>${f1(r.mid)}</b></td>`:''}</tr>`).join('')}</tbody></table></div></div>`;
  const G1=t2?groupsOf(cfgOf(c.code,1)):[],cfg1=t2?cfgOf(c.code,1):null,F1=t2?fulls(c.code,1):null,R1=t2?calc(c.code,1):null;
- const struct=(t2?structF(1,cfg1,F1,G1):'')+structF(S.term,cfg,F,G),sub=(t2?subF(1,cfg1,G1,R1):'')+subF(S.term,cfg,G,R);
+ const struct=(t2?structF(1,cfg1,F1,G1):'')+structF(S.term,cfg,F,G);
+ /* เวลาเรียนรายวัน (แนวนอน) */
+ const attF=T=>{const A=S.att[c.code+'|'+T];if(!A||!A.days||!A.days.length)return '';
+  const RT=T===S.term?R:calc(c.code,T),HT=cfgOf(c.code,T).hours,days=[...A.days].sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0),PER=20,RPP=20,dch=[],sch=[];
+  for(let i=0;i<days.length;i+=PER)dch.push(days.slice(i,i+PER));
+  for(let i=0;i<RT.length;i+=RPP)sch.push(RT.slice(i,i+RPP));
+  const stOf=(sid,d)=>((A.m||{})[sid]||{})[d]||'',blank=n=>'<td></td>'.repeat(n),blankH=n=>'<th></th>'.repeat(n);
+  let out='';
+  dch.forEach((dc,di)=>{const lastD=di===dch.length-1,pad=PER-dc.length,grp=[];
+   dc.forEach(x=>{const q=x.d.split('-'),k=q[0]+q[1],g=grp[grp.length-1];if(g&&g.k===k)g.n++;else grp.push({k,n:1,t:MSHORT[+q[1]-1]+' '+String((+q[0]+543)%100)});});
+   const mh=grp.map(g=>`<th colspan="${g.n}">${g.t}</th>`).join('')+(pad?`<th colspan="${pad}"></th>`:''),dh=dc.map(x=>`<th>${+x.d.slice(8)}</th>`).join('')+blankH(pad),hh=dc.map(x=>`<th>${x.h}</th>`).join('')+blankH(pad);
+   sch.forEach((sc,si)=>{const lastS=si===sch.length-1;
+    out+=`<div class="pg land">${ph()}${hd('บันทึกเวลาเรียนรายวัน'+(pri?` ภาคเรียนที่ ${T}`:'')+` · ${esc(c.name)} ชั้น ${c.level}`)}
+  <div class="tw"><table class="att"><colgroup><col style="width:4%">${hasSid?'<col style="width:8%">':''}<col style="width:22%">${'<col style="width:2.8%">'.repeat(PER)}${lastD?'<col style="width:5%"><col style="width:5%"><col style="width:5%">':''}</colgroup><thead><tr><th rowspan="3">เลขที่</th>${SID(3)}<th rowspan="3">ชื่อ - สกุล</th>${mh}${lastD?'<th rowspan="3">ขาด<br>(ชม.)</th><th rowspan="3">เวลาเรียน<br>ร้อยละ</th><th rowspan="3">ผล</th>':''}</tr><tr>${dh}</tr><tr>${hh}</tr></thead><tbody>
+  ${sc.map(r=>{const ab=Math.min(HT,attAbs(c.code,T,r.s.id)||0),pc2=(HT-ab)/HT*100;return `<tr>${stuCells(r)}${dc.map(x=>`<td class="num">${stOf(r.s.id,x.d)||'/'}</td>`).join('')}${blank(pad)}${lastD?`<td class="num">${ab||'-'}</td><td class="num">${f1(pc2)}</td><td class="num">${(!pri||T===2)?(r.ms?'มส':'ผ่าน'):''}</td>`:''}</tr>`;}).join('')}
+  ${lastS?`<tr><td colspan="${2+(hasSid?1:0)}" style="text-align:right"><b>มาเรียน (คน)</b></td>${dc.map(x=>`<td class="num">${RT.filter(r=>!ATABS.includes(stOf(r.s.id,x.d)||'-')).length}</td>`).join('')}${blank(pad)}${lastD?blank(3):''}</tr>`:''}</tbody></table></div>
+  <div class="small">เครื่องหมาย: / = มาเรียน · ข = ขาด · ล = ลากิจ · ป = ลาป่วย · ส = มาสาย (นับว่ามาเรียน) · น = หนีเรียน · ขาด ลา ป่วย หนีเรียน นับเป็นชั่วโมงที่ไม่ได้เรียน · ต้องมีเวลาเรียนไม่ต่ำกว่าร้อยละ 80 ของเวลาเรียนทั้งหมด (${HT} ชั่วโมง)</div>
+  ${(lastD&&lastS)?`<div style="width:min(300px,100%);margin-left:auto">${bl(tn,'ครูผู้สอน',sTeach)}</div>`:''}</div>`;});});
+  return out;};
+ const attP=(t2?attF(1):'')+attF(S.term);
+ const sub=(t2?subF(1,cfg1,G1,R1):'')+subF(S.term,cfg,G,R);
  /* ผลการเรียน */
  const resF=(T,cfg,F,G,R,showG)=>{const scl=pri&&F.base===100,multi=G.length>1;
   const heads=[...G.map(g=>[esc(g.label),g.max]),...(multi?[['รวมระหว่างเรียน',F.mid]]:[]),['สอบปลายภาค',F.fin],[pri?`รวมภาคเรียนที่ ${T}${scl?' (เก็บ 100)':''}`:'รวม',F.base],...(scl?[['ย่อเหลือ 50 คะแนน',50]]:[])];
@@ -263,6 +316,7 @@ P.p5=()=>{
  /* ตรวจความครบถ้วน */
  const evFull=!evOn||EVK.every(([k,,,it])=>R.every(r=>evLab(r,k,it.length))),evLock=!S.tpl&&evOn&&!evFull;
  const chk=[
+  ['เช็คชื่อรายวันแล้ว',attHas(c.code,S.term)||(pri&&S.term===2&&attHas(c.code,1)&&attHas(c.code,2)),'att'],
   ['คะแนนครบทุกคน (ระหว่างเรียนและปลายภาค)',R.every(r=>r.tot!=null),'scores'],
   ['คำอธิบายรายวิชา (ข้อความหรือภาพ)',!!(meta.desc||meta.img),null],
   ['มาตรฐาน/ตัวชี้วัด และเวลาของทุกหน่วย',[...G1.map(g=>[1,g]),...G.map(g=>[S.term,g])].every(([T,g])=>{const m=meta.units[uk(T,g.label)]||{};return m.std&&m.hrs}),null],
@@ -297,10 +351,10 @@ P.p5=()=>{
   <code style="word-break:break-all">${esc(fname(c,'pdf'))}</code>
   ${evLock?`<div class="lock small">ล็อกอยู่: ยังประเมินผู้เรียนไม่ครบ ${evMiss(c.code,S.term,R)} คน ต้องประเมินคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะให้ครบก่อน จึงจะลงนามและดาวน์โหลดได้ <button class="btn sm" data-go="eval">ไปประเมิน</button></div>`:''}
   <div class="row">${['PDF','Excel','Word'].map(f=>`<button class="btn sm ${f==='PDF'?'':'alt'}" data-act="dl" data-f="${f}" ${evLock?'disabled':''}>${f}</button>`).join('')}</div>
-  <div class="small muted">เรียงชื่อ: ชื่อวิชา_ชั้น_ภาคเรียน_ปีการศึกษา_ครูผู้สอน · จัดหน้าตามแบบ ปพ.5 ของโรงเรียน (ไม่มีหน้าบันทึกเวลาเรียน) A4 ฟอนต์ TH Sarabun</div></div>
+  <div class="small muted">เรียงชื่อ: ชื่อวิชา_ชั้น_ภาคเรียน_ปีการศึกษา_ครูผู้สอน · จัดหน้าตามแบบ ปพ.5 ของโรงเรียน (มีหน้าเวลาเรียนรายวันแนวนอนเมื่อเช็คชื่อแล้ว) A4 ฟอนต์ TH Sarabun</div></div>
  ${editor}
  <h3>ตัวอย่างหน้าในเล่ม</h3>
- ${L('หน้าสรุปและลงนาม',info)}${L('คำอธิบายรายวิชา',desc)}${L('โครงสร้างรายวิชา',struct)}${L('คะแนนย่อยระหว่างเรียน',sub)}${L('ผลการเรียน',resP)}${evP?evP+'<div class="pgl">ผลการประเมิน</div>':''}${L('สรุปผลการเรียน',sumP)}${L('แก้ไขผลการเรียน',fixP)}${L('คำชี้แจงเกณฑ์',crit)}
+ ${L('หน้าสรุปและลงนาม',info)}${L('คำอธิบายรายวิชา',desc)}${L('โครงสร้างรายวิชา',struct)}${L('เวลาเรียนรายวัน (เช็คชื่อ)',attP)}${L('คะแนนย่อยระหว่างเรียน',sub)}${L('ผลการเรียน',resP)}${evP?evP+'<div class="pgl">ผลการประเมิน</div>':''}${L('สรุปผลการเรียน',sumP)}${L('แก้ไขผลการเรียน',fixP)}${L('คำชี้แจงเกณฑ์',crit)}
  <p class="small muted">ข้อมูลผลประเมิน ลายเซ็น และคำอธิบายในต้นแบบเป็นตัวอย่างสมมติ</p></div>`;};
 
 const GUIDE={
@@ -533,12 +587,23 @@ const WORD_NS = 'xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:
 function pageDoc(title, inner, word) {
   return `<!doctype html><html ${word ? WORD_NS : ''}><head><meta charset="utf-8"><title>${esc(title)}</title><style>${printCss(location.origin)}${word ? '' : ''}</style></head><body>${inner}</body></html>`
 }
-function printPages(title, inner) {
-  const w = window.open('', '_blank')
+async function printPages(title, inner) {
+  // เปิดเป็นหน้า Blob (รีเฟรชได้ ไม่ค้าง) พร้อมแถบปุ่มพิมพ์ — สั่งพิมพ์อัตโนมัติเฉพาะครั้งแรก และรอให้ภาพโหลดครบก่อน
+  const w = window.open('about:blank', '_blank')
   if (!w) return toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาต pop-up แล้วกดอีกครั้ง')
-  w.document.open(); w.document.write(pageDoc(title, inner)); w.document.close()
-  const go = () => { w.focus(); w.print() }
-  w.onload = () => { (w.document.fonts && w.document.fonts.ready ? w.document.fonts.ready : Promise.resolve()).then(() => setTimeout(go, 300)) }
+  try { w.document.title = title; w.document.body.innerHTML = '<p style="font:18px sans-serif;padding:24px">กำลังเตรียมเอกสาร…</p>' } catch { /* ไม่เป็นไร */ }
+  let body = inner
+  try { // ฝังโลโก้เป็นภาพในตัว กันภาพไม่ขึ้นในหน้าใหม่
+    const blob = await (await fetch(LOGO)).blob()
+    const du = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob) })
+    body = body.split(LOGO).join(du)
+  } catch { /* ใช้ลิงก์เดิม */ }
+  const bar = '<div class="noprint" style="position:sticky;top:0;z-index:9;display:flex;gap:10px;align-items:center;justify-content:center;padding:10px;background:#7a1010;color:#fff;font:16px sans-serif"><span>ตัวอย่างก่อนพิมพ์ — เลือก “บันทึกเป็น PDF” ที่ปลายทางเครื่องพิมพ์</span><button onclick="print()" style="padding:8px 18px;border:0;border-radius:8px;background:#f5c542;font:bold 16px sans-serif;cursor:pointer">พิมพ์ / บันทึก PDF</button><button onclick="window.close()" style="padding:8px 14px;border:0;border-radius:8px;background:#fff;font:16px sans-serif;cursor:pointer">ปิด</button></div><style>@media print{.noprint{display:none!important}}@media screen{body{background:#ddd}}</style>'
+  const scr = '<script>addEventListener("load",function(){var n=performance.getEntriesByType&&performance.getEntriesByType("navigation")[0];if(n&&n.type==="reload")return;var im=[].slice.call(document.images).map(function(i){return i.complete?1:new Promise(function(r){i.onload=i.onerror=r})});Promise.all(im).then(function(){return document.fonts&&document.fonts.ready}).then(function(){setTimeout(function(){print()},500)})})<\/script>'
+  const html = pageDoc(title, bar + body).replace('<head>', `<head><base href="${location.origin}/">`).replace('</body>', scr + '</body>')
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+  w.location.replace(url)
+  setTimeout(() => URL.revokeObjectURL(url), 10 * 60 * 1000)
 }
 function saveBlob(name, mime, text) {
   const a = document.createElement('a')
@@ -626,6 +691,51 @@ reg('click', (e) => {
   else if (a === 'rdl') downloadReport(d.w)
   else if (a === 'sumdl') downloadSummary(d.f)
 })
+/* เช็คชื่อรายวัน: ตัวจัดการปุ่ม */
+reg('click', (e) => {
+  const t = e.target.closest('[data-ac],[data-at]')
+  if (!t || !$('#view') || !$('#view').contains(t)) return
+  const c = S.scCode, T = S.term, A = attOf(c, T), ids = ACT().filter((x) => x.level === CAT.find((z) => z.code === c).level).map((x) => x.id)
+  if (t.dataset.ac) {
+    const [sid, d] = t.dataset.ac.split('|'), m = (A.m[sid] = A.m[sid] || {}), n = ATC[(ATC.indexOf(m[d] || '') + 1) % ATC.length]
+    if (n) m[d] = n; else delete m[d]
+    attRender(); return
+  }
+  const a = t.dataset.at, h = Math.max(1, Math.min(8, +($('#atth') || {}).value || 1))
+  if (a === 'add') {
+    const v = $('#attd').value; if (!v) return toast('เลือกวันที่ก่อน')
+    const n = attAddDays([v], h); S.attH = h
+    const nx = new Date(v + 'T00:00:00'); do nx.setDate(nx.getDate() + 1); while (nx.getDay() === 0 || nx.getDay() === 6)
+    S.attLast = isoD(nx); toast(n ? 'เพิ่มวันเรียนแล้ว' : 'มีวันนี้อยู่แล้ว'); attRender()
+  } else if (a === 'range') {
+    const f = $('#attf').value, e2 = $('#attt').value; if (!f || !e2 || e2 < f) return toast('เลือกวันเริ่มและวันสิ้นสุดให้ถูกต้อง')
+    const we = $('#attwe').checked, list = [], d = new Date(f + 'T00:00:00'), end = new Date(e2 + 'T00:00:00')
+    while (d <= end && list.length < 370) { if (we || (d.getDay() !== 0 && d.getDay() !== 6)) list.push(isoD(d)); d.setDate(d.getDate() + 1) }
+    const n = attAddDays(list, h); S.attH = h; toast(`เพิ่มแล้ว ${n} วัน`); attRender()
+  } else if (a === 'apply') {
+    const st = $('#atss').value, ss = S.attS.length ? S.attS : null, dd = S.attD.length ? S.attD : null
+    if (!ss && !dd) return toast('ติ๊กนักเรียน หรือหัวคอลัมน์วันที่ ที่ต้องการก่อน')
+    ;(ss || ids).forEach((sid) => { const m = (A.m[sid] = A.m[sid] || {}); (dd || A.days.map((x) => x.d)).forEach((d) => { if (st) m[d] = st; else delete m[d] }) })
+    toast('บันทึกแล้ว'); attRender()
+  } else if (a === 'selall') { S.attS = ids.slice(); attRender() }
+  else if (a === 'selnone') { S.attS = []; S.attD = []; attRender() }
+  else if (a === 'allpresent') {
+    ask({ title: 'ให้ทุกคนมาเรียนทุกวัน ?', text: 'ล้างสถานะ ขาด/ลา/ป่วย/สาย/หนีเรียน ของภาคเรียนนี้ทั้งหมด (วันเรียนยังอยู่)', ok: 'ล้างทั้งหมด', danger: true }).then((ok) => { if (ok) { A.m = {}; attRender() } })
+  } else if (a === 'delday') {
+    if (!S.attD.length) return toast('ติ๊กหัวคอลัมน์วันที่ที่จะลบก่อน')
+    ask({ title: `ลบวันที่เลือก ${S.attD.length} วัน ?`, text: 'สถานะการมาเรียนของวันเหล่านั้นจะถูกลบด้วย', ok: 'ลบ', danger: true }).then((ok) => {
+      if (!ok) return
+      const del = new Set(S.attD); A.days = A.days.filter((x) => !del.has(x.d)); Object.values(A.m).forEach((m) => del.forEach((d) => delete m[d])); S.attD = []; attRender()
+    })
+  }
+})
+reg('change', (e) => {
+  const t = e.target, d = t.dataset
+  if (!$('#view') || !$('#view').contains(t)) return
+  const tog = (k, v) => { const a = (S[k] = S[k] || []), i = a.indexOf(v); if (t.checked) { if (i < 0) a.push(v) } else if (i >= 0) a.splice(i, 1) }
+  if (d.as !== undefined) tog('attS', d.as)
+  else if (d.ad !== undefined) tog('attD', d.ad)
+})
 reg('change', (e) => {
   const t = e.target
   if (!$('#view') || !$('#view').contains(t)) return
@@ -699,6 +809,7 @@ const docId = (b, sub) => `${S.year}~${b}~${encodeURIComponent(sub).replace(/\./
 function cleaned(b, d) {
   if (b === 'cfg' && d.cols && d.cols.length === 1 && d.cols[0].n === 'คะแนนเก็บระหว่างภาค' && d.scale === 100 && d.hours === 40 && !d.ratio) return {}
   if (b === 'scores') { const o = {}; for (const [k, v] of Object.entries(d)) if ((v.c || []).some((x) => x !== '' && x != null) || (v.f !== '' && v.f != null)) o[k] = v; return o }
+  if (b === 'att') { if (!d.days || !d.days.length) return {}; const m = {}; for (const [k, v] of Object.entries(d.m || {})) { const o = Object.fromEntries(Object.entries(v).filter(([, x]) => x)); if (Object.keys(o).length) m[k] = o } return { days: d.days, m } }
   if (b === 'ab') { const o = {}; for (const [k, v] of Object.entries(d)) if (Object.values(v).some((x) => +x > 0)) o[k] = v; return o }
   return d
 }

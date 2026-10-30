@@ -324,3 +324,12 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .mgrid .chip.mem[aria-pressed="true"]::before{content:"✓ "}
 
 .chip[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+
+/* เช็คชื่อรายวัน */
+.pg.land{max-width:1120px}
+.attm th.atd{min-width:46px;font-weight:600}.attm td.ac{padding:2px;text-align:center}
+.astb{width:36px;height:34px;border-radius:8px;border:1px solid var(--line,#ddd);background:#f3faf4;color:#2e7d32;font-weight:700;font-size:1rem;cursor:pointer;padding:0}
+.astb.asข{background:#fde4e1;color:#b3261e;border-color:#f3b4ad}.astb.asล{background:#e3eefc;color:#1d5fb4;border-color:#b2cdef}.astb.asป{background:#fff0d6;color:#a35a00;border-color:#f0cf93}
+.astb.asส{background:#f3e6fb;color:#7b2fa0;border-color:#d8b9ec}.astb.asน{background:#e9e0dc;color:#5d4037;border-color:#c9b9b2}
+.attm{min-width:max-content}
+.dlg p{white-space:pre-line}

@@ -20,3 +20,15 @@ export function useRegs() {
   }, [openYear?.year, user.uid, user.role])
   return regs
 }
+
+// ใบลงทะเบียนทุกคนของปีที่เปิด (ใช้เตือนวิชาซ้ำ: ครูทุกคนอ่านได้ เฉพาะชื่อครู/รหัสวิชา/สถานะ)
+export function useAllRegs() {
+  const { openYear } = useData()
+  const [regs, setRegs] = useState([])
+  useEffect(() => {
+    if (!openYear) { setRegs([]); return }
+    return onSnapshot(query(collection(db, 'registrations'), where('year', '==', openYear.year)),
+      (s) => setRegs(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setRegs([]))
+  }, [openYear?.year])
+  return regs
+}

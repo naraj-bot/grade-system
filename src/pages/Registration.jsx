@@ -4,16 +4,16 @@ import { db } from '../firebase'
 import { useAuth } from '../auth'
 import { useData } from '../data'
 import Catalog from './Catalog'
-import { useRegs } from '../lib/useRegs'
+import { useAllRegs, useRegs } from '../lib/useRegs'
 import { notify } from '../lib/notify'
-import { tell } from '../lib/dialog'
+import { ask, tell } from '../lib/dialog'
 import { LEVELS, REG_STATUS, isAdminRole } from '../lib/constants'
 
-const Row = memo(function Row({ c, on, onToggle }) {
+const Row = memo(function Row({ c, on, onToggle, taken }) {
   return (
     <tr>
       <td><input type="checkbox" checked={on} aria-label={`เลือก ${c.name}`} onChange={() => onToggle(c.code)} /></td>
-      <td>{c.level}</td><td>{c.code}</td><td>{c.name}</td>
+      <td>{c.level}</td><td>{c.code}</td><td>{c.name}{taken && <div className="small" style={{ color: 'var(--bad, #b3261e)' }}>มีครูลงทะเบียนแล้ว: {taken}</div>}</td>
     </tr>
   )
 })
@@ -78,11 +78,19 @@ function AdminView({ regs }) {
 }
 
 // ครู: เลือกชั้น (หลายชั้น) แล้วติ๊กวิชาที่สอน ส่งให้แอดมินอนุมัติทุกภาคเรียน
-function TeacherView({ regs }) {
+function TeacherView({ regs, all }) {
   const { user } = useAuth()
   const { openYear, term, termCatalog, catalog, openSet } = useData()
   const admin = isAdminRole(user.role)
   const mine = regs.find((r) => r.term === term && r.uid === user.uid)
+  // วิชาที่ครูท่านอื่นลงทะเบียนไว้แล้ว (ภาคเรียนเดียวกัน) → รหัส: "ชื่อครู (สถานะ)"
+  const takenMap = useMemo(() => {
+    const m = {}
+    all.filter((r) => r.term === term && r.uid !== user.uid && r.status !== 'back').forEach((r) => {
+      (r.codes || []).forEach((code) => { (m[code] ||= []).push(`${r.name || 'ครู'}${r.status === 'ok' ? '' : ' (รออนุมัติ)'}`) })
+    })
+    return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.join(', ')]))
+  }, [all, term, user.uid])
   const [levels, setLevels] = useState(() => new Set(mine ? mine.codes.map((c) => catalog.find((x) => x.code === c)?.level).filter(Boolean) : []))
   const [picked, setPicked] = useState(() => new Set(mine ? mine.codes : []))
   const [busy, setBusy] = useState(false)
@@ -113,6 +121,12 @@ function TeacherView({ regs }) {
   const submit = async () => {
     const codes = [...picked].filter((code) => levels.has(catalog.find((x) => x.code === code)?.level))
     if (!codes.length) return tell({ title: 'ยังไม่ได้เลือกวิชา', text: 'เลือกวิชาที่สอนอย่างน้อย 1 วิชา', tone: 'warn' })
+    const dup = codes.filter((code) => takenMap[code])
+    if (dup.length) {
+      const lines = dup.map((code) => `• ${code} ${catalog.find((x) => x.code === code)?.name || ''} — ${takenMap[code]}`).join('\n')
+      const go = await ask({ title: 'มีครูท่านอื่นลงทะเบียนวิชานี้แล้ว', text: `${lines}\n\nหากสอนร่วมหรือสอนคนละห้อง กด “ลงทะเบียนต่อ” ได้ แต่ถ้าเลือกผิด ให้กลับไปแก้ก่อน`, ok: 'ลงทะเบียนต่อ', cancel: 'กลับไปแก้' })
+      if (!go) return
+    }
     setBusy(true)
     try {
       await setDoc(doc(db, 'registrations', `${openYear.year}_${term}_${user.uid}`), {
@@ -151,11 +165,12 @@ function TeacherView({ regs }) {
             <table>
               <thead><tr><th></th><th>ชั้น</th><th>รหัส</th><th>รายวิชา</th></tr></thead>
               <tbody>
-                {subj.map((c) => <Row key={c.code} c={c} on={picked.has(c.code)} onToggle={togglePick} />)}
+                {subj.map((c) => <Row key={c.code} c={c} on={picked.has(c.code)} onToggle={togglePick} taken={takenMap[c.code]} />)}
                 {!subj.length && <tr><td colSpan={4} className="empty">เลือกชั้นก่อน (แสดงเฉพาะวิชาที่แอดมินเปิดสอนแล้ว)</td></tr>}
               </tbody>
             </table>
           </div>
+          {[...picked].some((c) => takenMap[c]) && <div className="lock small">วิชาที่เลือกมีครูท่านอื่นลงทะเบียนแล้ว: {[...picked].filter((c) => takenMap[c]).map((c) => `${c} (${takenMap[c]})`).join(' · ')}</div>}
           <div className="row"><button className="btn" disabled={busy} onClick={submit}>{admin ? `บันทึกวิชาที่ฉันสอน (${picked.size} วิชา)` : `ส่งให้แอดมินอนุมัติ (${picked.size} วิชา)`}</button></div>
         </div>
       )}
@@ -167,12 +182,13 @@ export default function Registration() {
   const { user } = useAuth()
   const { openYear } = useData()
   const regs = useRegs()
+  const all = useAllRegs()
   if (!openYear) return <div className="stack"><div className="card tplbar"><b>ยังไม่กำหนดปีการศึกษา</b> — ลงทะเบียนสอนยังไม่ได้ ดูรายวิชาทั้งหมดได้ด้านล่าง (แอดมินหลักเปิดปีการศึกษาได้ที่เมนู "ปีการศึกษา")</div><Catalog /></div>
-  if (!isAdminRole(user.role)) return <TeacherView regs={regs} />
+  if (!isAdminRole(user.role)) return <TeacherView regs={regs} all={all} />
   return (
     <div className="stack">
       <div className="small muted">แอดมินที่สอนด้วย: เลือกวิชาของตัวเองด้านล่าง (อนุมัติให้เองทันที) ส่วนรายการอนุมัติของครูอยู่ถัดลงไป</div>
-      <TeacherView regs={regs} />
+      <TeacherView regs={regs} all={all} />
       <h3>อนุมัติการลงทะเบียนของครู</h3>
       <AdminView regs={regs.filter((r) => r.uid !== user.uid)} />
     </div>

@@ -74,3 +74,32 @@ export async function promoteAll(students, by) {
   }
   return act.length
 }
+
+// ลบนักเรียนถาวร (ใช้กับรายชื่อที่เพิ่มผิด) — คะแนนที่ผูกกับรหัสนักเรียนจะไม่ถูกนำมาแสดงอีก
+export async function deleteStudents(list, by) {
+  let first = true
+  for (const part of chunk(list)) {
+    const b = writeBatch(db)
+    part.forEach((s) => b.delete(doc(db, 'students', s.id)))
+    if (first) {
+      const names = list.slice(0, 5).map((s) => s.name).join(', ') + (list.length > 5 ? ` และอีก ${list.length - 5} คน` : '')
+      b.set(logRef(), logData(by, `ลบนักเรียน ${list.length} คน: ${names}`)); first = false
+    }
+    await b.commit()
+  }
+  return list.length
+}
+
+// เรียงเลขที่ใหม่ 1,2,3… ตามลำดับเดิม (เฉพาะที่กำลังเรียนในชั้นนั้น)
+export async function renumberLevel(students, level, by) {
+  const act = students.filter((s) => s.level === level && (s.status || 'active') === 'active').sort((a, b) => (a.no || 0) - (b.no || 0))
+  const ch = act.map((s, i) => [s, i + 1]).filter(([s, n]) => s.no !== n)
+  let first = true
+  for (const part of chunk(ch)) {
+    const b = writeBatch(db)
+    part.forEach(([s, n]) => b.update(doc(db, 'students', s.id), { no: n }))
+    if (first) { b.set(logRef(), logData(by, `เรียงเลขที่ใหม่ ${level} (${ch.length} คน)`)); first = false }
+    await b.commit()
+  }
+  return ch.length
+}

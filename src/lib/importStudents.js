@@ -98,7 +98,7 @@ export async function readXlsx(buf) {
 // แปลงตารางดิบเป็นรายชื่อ: คืน { rows:[{name,no,level,st}], hdr }
 // st: 'ok' | 'dup' (ชื่อซ้ำกับคนที่กำลังเรียน) | 'level' (ชั้นไม่ถูกต้อง)
 export function mapRows(raw, defaultLevel, activeStudents) {
-  let rows = raw.map((r) => Array.from({ length: r.length }, (_, i) => String(r[i] == null ? '' : r[i]).trim()))
+  let rows = raw.map((r) => Array.from({ length: r.length }, (_, i) => String(r[i] == null ? '' : r[i]).replace(/\s+/g, ' ').trim()))
     .filter((r) => r.some((x) => x))
   const HEAD = /^(เลขประจำตัว(นักเรียน)?|รหัสนักเรียน|เลขที่|ลำดับ|ที่|คำนำหน้า|ชื่อ|ชื่อ\s*-?\s*(นาม)?สกุล|ชื่อจริง|นามสกุล|สกุล|ชั้น|ระดับชั้น|ชั้นเรียน|เลขประจำตัว.*)$/
   const hi = rows.slice(0, 8).findIndex((r) => r.filter((x) => HEAD.test(x)).length >= 2 || r.some((x) => /^ชื่อ\s*-?\s*(นาม)?สกุล$/.test(x)))
@@ -125,9 +125,16 @@ export function mapRows(raw, defaultLevel, activeStudents) {
       if (M.lv != null && r[M.lv]) level = normLevel(r[M.lv])
       if (M.sid != null) sid = r[M.sid] || ''
     } else {
-      name = r.find((x) => x && !/^\d+$/.test(x))
-      const nn = r.find((x) => /^\d+$/.test(x))
-      if (nn) no = +nn
+      // ไม่มีหัวตาราง: ตัวเลข ≤3 หลัก = เลขที่, ≥4 หลัก = เลขประจำตัว, ข้อความ = ชื่อ (ลำดับคอลัมน์อะไรก็ได้)
+      const cells = r.filter(Boolean)
+      const nums = cells.filter((x) => /^\d+$/.test(x))
+      const txt = cells.filter((x) => !/^\d+$/.test(x))
+      const lv = txt.find((x) => /^(ป|ม)\.?\s?\d$/.test(x.replace(/\s/g, '')))
+      if (lv) level = normLevel(lv)
+      name = txt.filter((x) => x !== lv).join(' ')
+      const a = nums.find((x) => x.length <= 3), b = nums.find((x) => x.length >= 4)
+      if (a) no = +a
+      if (b) sid = b
     }
     name = (name || '').replace(/\s+/g, ' ').trim()
     return { name, no, level, sid }
@@ -138,6 +145,24 @@ export function mapRows(raw, defaultLevel, activeStudents) {
     if (x.st === 'ok') seen.add(`${x.level}|${x.name}`)
   })
   return { rows: out, hdr }
+}
+
+// วางข้อความหลายบรรทัด (จาก Excel/เอกสาร/พิมพ์เอง) แล้วแปลงเป็นตารางดิบ: รองรับแท็บ , ; หรือเว้นวรรค
+export function linesToRows(text) {
+  const lines = String(text || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
+  return lines.map((l) => {
+    if (/[\t;|]/.test(l)) return l.split(/[\t;|]/)
+    if (/,/.test(l)) return l.split(',')
+    const t = l.split(/\s+/)
+    const out = []
+    let i = 0
+    while (i < t.length && /^\d+$/.test(t[i])) out.push(t[i++])
+    let j = t.length
+    const tail = []
+    while (j > i && /^\d+$/.test(t[j - 1])) tail.unshift(t[--j])
+    out.push(t.slice(i, j).join(' '))
+    return out.concat(tail)
+  })
 }
 
 export async function readStudentFile(file, defaultLevel, activeStudents) {
