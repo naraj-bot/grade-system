@@ -45,7 +45,7 @@ const MAIN = { superadmin: ['/', '/years', '/users', '/reg'], schooladmin: ['/',
 
 function Shell() {
   const { user, logout } = useAuth()
-  const { term, setTerm, openYear } = useData()
+  const { term, setTerm, openYear, t2open } = useData()
   const nav = useNavigate()
   const loc = useLocation()
   const [more, setMore] = useState(false)
@@ -113,7 +113,7 @@ function Shell() {
           <div className="tools">
             {openYear && <span className="pill p-gold">ปีการศึกษา {openYear.year}</span>}
             {[1, 2].map((t) => (
-              <button key={t} className="chip" aria-pressed={term === t} onClick={() => setTerm(t)}>ภาคเรียนที่ {t}</button>
+              <button key={t} className="chip" aria-pressed={term === t} aria-disabled={t === 2 && !t2open} title={t === 2 && !t2open ? 'ภาคเรียนที่ 2 ยังไม่เปิด' : ''} onClick={() => setTerm(t)}>ภาคเรียนที่ {t}</button>
             ))}
             <Bell />
             <span className="topuser small">{user.name} ({ROLE_LABEL[user.role]})</span>

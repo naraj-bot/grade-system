@@ -1,3 +1,4 @@
+import { tell } from './lib/dialog'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { db } from './firebase'
@@ -33,9 +34,15 @@ export function DataProvider({ children }) {
     return () => { u1(); u2() }
   }, [user, openYear?.year])
 
-  const defaultTerm = terms.some((t) => t.term === 2 && t.status === 'open') ? 2 : 1
-  const term = termSel || defaultTerm
-  const setTerm = (t) => { localStorage.setItem('term', String(t)); setTermSel(t) }
+  const t2open = terms.some((t) => t.term === 2 && t.status === 'open')
+  const defaultTerm = t2open ? 2 : 1
+  // ภาคเรียนที่ 2 ใช้ได้เมื่อแอดมินหลักเปิดแล้วเท่านั้น (ยังไม่เปิดปีการศึกษา = โหมดดูแบบฟอร์ม ใช้ได้ทั้งสองภาค)
+  const lock2 = !!openYear && !t2open
+  const term = lock2 ? 1 : (termSel || defaultTerm)
+  const setTerm = (t) => {
+    if (t === 2 && lock2) { tell({ title: 'ภาคเรียนที่ 2 ยังไม่เปิด', text: 'แอดมินหลักต้องเปิดภาคเรียนที่ 2 ที่เมนู "ปีการศึกษา" ก่อน จึงจะลงทะเบียน/บันทึกคะแนนได้', tone: 'warn' }); return }
+    localStorage.setItem('term', String(t)); setTermSel(t)
+  }
 
   const openSet = useMemo(() => new Set(openDocs.map((d) => d.code)), [openDocs])
   const activeStudents = useMemo(() => students.filter((s) => (s.status || 'active') === 'active'), [students])
@@ -44,7 +51,7 @@ export function DataProvider({ children }) {
   const termCatalog = useMemo(() => catalog.filter((c) => isPri(c.level) || String(c.term) === String(term)), [term])
 
   return (
-    <Ctx.Provider value={{ years, openYear, terms, term, setTerm, students, activeStudents, catalog, termCatalog, openSet }}>
+    <Ctx.Provider value={{ years, openYear, terms, t2open: !lock2, term, setTerm, students, activeStudents, catalog, termCatalog, openSet }}>
       {children}
     </Ctx.Provider>
   )
