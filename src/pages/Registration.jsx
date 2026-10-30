@@ -21,12 +21,22 @@ const Row = memo(function Row({ c, on, onToggle }) {
 const pillOf = (s) => (s === 'ok' ? 'p-good' : s === 'pending' ? 'p-warn' : 'p-bad')
 
 function Codes({ codes, catalog }) {
+  // จัดกลุ่มตามชั้น: แถวละชั้น  [ชั้น] วิชา · วิชา · วิชา
+  const by = {}
+  codes.forEach((c) => {
+    const x = catalog.find((y) => y.code === c)
+    const L = x ? x.level : '?'
+    ;(by[L] = by[L] || []).push(x ? x.name : c)
+  })
+  const order = [...LEVELS, '?'].filter((l) => by[l])
   return (
-    <div className="small">
-      {codes.map((c) => {
-        const x = catalog.find((y) => y.code === c)
-        return <span key={c} className="pill p-gold" style={{ marginRight: 4 }}>{x ? `${x.level} ${x.name}` : c}</span>
-      })}
+    <div className="regsum">
+      {order.map((l) => (
+        <div className="rs-row" key={l}>
+          <span className="rs-lv">{l === '?' ? 'อื่นๆ' : l}</span>
+          <span className="rs-sub">{by[l].join('  ·  ')}</span>
+        </div>
+      ))}
     </div>
   )
 }
