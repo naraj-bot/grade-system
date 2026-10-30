@@ -305,3 +305,20 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .hrc b{font-family:var(--f-display);color:var(--red-ink);font-size:1.05rem}
 .hrc label{display:grid;gap:3px;font-size:.82rem;color:var(--muted);font-weight:600}
 .hrc select{width:100%}
+
+/* ตารางเลือกวิชา: เลื่อนในกรอบ + ข้ามการวาดแถวนอกจอ ให้เลื่อนลื่น */
+.regtw{max-height:60vh;overflow:auto;-webkit-overflow-scrolling:touch}
+.regtw thead th{position:sticky;top:0;z-index:2}
+.regtw tbody tr{content-visibility:auto;contain-intrinsic-size:auto 40px}
+.regtw tbody tr:hover{background:inherit}
+
+/* สรุปวิชาที่สอน: แถวละชั้น แทนป้ายกองใหญ่ */
+.regsum{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fffdf9}
+.rs-row{display:flex;gap:14px;align-items:baseline;padding:9px 14px;border-bottom:1px solid rgba(160,110,60,.14)}
+.rs-row:last-child{border-bottom:0}
+.rs-lv{flex:0 0 auto;min-width:46px;text-align:center;background:linear-gradient(180deg,#a02424,#7f1818);color:#fff;border-radius:8px;padding:2px 10px;font-weight:700;font-size:.9rem}
+.rs-sub{line-height:1.7;color:var(--fg)}
+/* รายชื่อสมาชิกชุมนุม: ตารางช่อง ไม่ใช่ป้ายยาว */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.mgrid .chip.mem{border-radius:10px;text-align:left;padding:7px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mgrid .chip.mem[aria-pressed="true"]::before{content:"✓ "}
