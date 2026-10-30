@@ -27,6 +27,7 @@ export default function Students() {
   const { students, activeStudents } = useData()
   const [level, setLevel] = useState('ป.1')
   const [name, setName] = useState('')
+  const [sid, setSid] = useState('')
   const [bulk, setBulk] = useState('')
   const [imp, setImp] = useState(null)
   const [edit, setEdit] = useState(null)
@@ -50,13 +51,17 @@ export default function Students() {
     e.preventDefault()
     const n = name.trim()
     if (!n) return
-    run(async () => { await addStudents([{ name: n, level }], students, user.name, `เพิ่ม ${n} (${level})`); setName('') })
+    run(async () => { await addStudents([{ name: n, level, sid: sid.trim() }], students, user.name, `เพิ่ม ${n} (${level})`); setName(''); setSid('') })
   }
   const addBulk = () => {
-    const names = bulk.split('\n').map((x) => x.trim()).filter(Boolean)
-    if (!names.length) return
+    // บรรทัดละคน: "ชื่อ-สกุล" หรือ "เลขประจำตัว<แท็บ/จุลภาค/เว้นวรรค>ชื่อ-สกุล" (เลขที่ 1 ขึ้นไปรันให้เอง)
+    const items = bulk.split('\n').map((x) => x.trim()).filter(Boolean).map((l) => {
+      const m = l.match(/^(\d{3,})\s*[\t,;]\s*(.+)$/) || l.match(/^(\d{3,})\s+(.+)$/)
+      return m ? { sid: m[1], name: m[2].trim(), level } : { name: l, level }
+    })
+    if (!items.length) return
     run(async () => {
-      const c = await addStudents(names.map((n) => ({ name: n, level })), students, user.name, `เพิ่มหลายคน ${names.length} คน (${level})`)
+      const c = await addStudents(items, students, user.name, `เพิ่มหลายคน ${items.length} คน (${level})`)
       setBulk(''); setMsg(`เพิ่มแล้ว ${c} คน`)
     })
   }
@@ -71,7 +76,7 @@ export default function Students() {
     setImp(null); setMsg(`นำเข้าแล้ว ${c} คน`)
   })
   const saveEdit = () => run(async () => {
-    const next = { ...edit.draft, no: Number(edit.draft.no) || edit.orig.no, name: edit.draft.name.trim() || edit.orig.name }
+    const next = { ...edit.draft, no: Number(edit.draft.no) || edit.orig.no, name: edit.draft.name.trim() || edit.orig.name, sid: (edit.draft.sid || '').trim() }
     await updateStudent(edit.orig, next, user.name)
     setEdit(null)
   })
@@ -91,6 +96,7 @@ export default function Students() {
         <h3>เพิ่มนักเรียน {level} <span className="muted small">(เลขที่ถัดไป {nextNo(students, level)})</span></h3>
         <form className="row" onSubmit={addOne}>
           <input placeholder="ชื่อ-สกุล" value={name} onChange={(e) => setName(e.target.value)} size={28} />
+          <input placeholder="เลขประจำตัว (ถ้ามี)" value={sid} onChange={(e) => setSid(e.target.value)} size={16} inputMode="numeric" />
           <button className="btn" disabled={busy}>เพิ่ม</button>
           <label className="btn alt" style={{ cursor: 'pointer' }}>
             นำเข้าไฟล์ Excel/CSV<input type="file" accept=".xlsx,.csv,.txt" hidden onChange={pick} />
@@ -99,7 +105,7 @@ export default function Students() {
         <details>
           <summary className="small">วางรายชื่อหลายคน (บรรทัดละคน)</summary>
           <div className="stack" style={{ marginTop: 8 }}>
-            <textarea rows={5} value={bulk} onChange={(e) => setBulk(e.target.value)} placeholder={'เด็กชายสมชาย ใจดี\nเด็กหญิงสมหญิง รักเรียน'} />
+            <textarea rows={5} value={bulk} onChange={(e) => setBulk(e.target.value)} placeholder={'เด็กชายสมชาย ใจดี\nเด็กหญิงสมหญิง รักเรียน\n12345  เด็กชายมานะ ตั้งใจ   (ใส่เลขประจำตัวนำหน้าได้)'} />
             <div><button className="btn sm" disabled={busy} onClick={addBulk}>เพิ่มทั้งหมด</button></div>
           </div>
         </details>
@@ -110,9 +116,9 @@ export default function Students() {
           <h3>ตรวจรายชื่อก่อนนำเข้า ({imp.rows.filter((r) => r.st === 'ok').length} จาก {imp.rows.length} รายการ)</h3>
           <div className="tw" style={{ maxHeight: 320 }}>
             <table>
-              <thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>ผล</th></tr></thead>
+              <thead><tr><th>เลขที่</th><th>เลขประจำตัว</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>ผล</th></tr></thead>
               <tbody>{imp.rows.map((r, i) => (
-                <tr key={i}><td>{r.no || '-'}</td><td>{r.name}</td><td>{r.level}</td>
+                <tr key={i}><td>{r.no || '-'}</td><td>{r.sid || '-'}</td><td>{r.name}</td><td>{r.level}</td>
                   <td><span className={`pill ${r.st === 'ok' ? 'p-good' : 'p-warn'}`}>{ST_LABEL[r.st]}</span></td></tr>
               ))}</tbody>
             </table>
@@ -146,13 +152,14 @@ export default function Students() {
 
       <div className="tw">
         <table>
-          <thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>สถานะ</th><th></th></tr></thead>
+          <thead><tr><th>เลขที่</th><th>เลขประจำตัว</th><th>ชื่อ-สกุล</th><th>สถานะ</th><th></th></tr></thead>
           <tbody>
             {list.map((s) => {
               const ed = edit && edit.orig.id === s.id
               return (
                 <tr key={s.id}>
                   <td>{ed ? <input size={3} value={edit.draft.no} onChange={(e) => setEdit({ ...edit, draft: { ...edit.draft, no: e.target.value } })} /> : s.no}</td>
+                  <td>{ed ? <input size={10} value={edit.draft.sid} onChange={(e) => setEdit({ ...edit, draft: { ...edit.draft, sid: e.target.value } })} /> : (s.sid || <span className="muted">-</span>)}</td>
                   <td>{ed ? <input value={edit.draft.name} onChange={(e) => setEdit({ ...edit, draft: { ...edit.draft, name: e.target.value } })} /> : s.name}</td>
                   <td>{ed
                     ? <select value={edit.draft.status} onChange={(e) => setEdit({ ...edit, draft: { ...edit.draft, status: e.target.value } })}>
@@ -160,11 +167,11 @@ export default function Students() {
                     : <span className={`pill ${(s.status || 'active') === 'active' ? 'p-good' : 'p-warn'}`}>{STUDENT_STATUS[s.status || 'active']}</span>}</td>
                   <td>{ed
                     ? <><button className="btn sm" disabled={busy} onClick={saveEdit}>บันทึก</button> <button className="btn sm alt" onClick={() => setEdit(null)}>ยกเลิก</button></>
-                    : <button className="btn sm alt" onClick={() => setEdit({ orig: s, draft: { name: s.name, no: s.no, level: s.level, status: s.status || 'active' } })}>แก้ไข</button>}</td>
+                    : <button className="btn sm alt" onClick={() => setEdit({ orig: s, draft: { name: s.name, sid: s.sid || '', no: s.no, level: s.level, status: s.status || 'active' } })}>แก้ไข</button>}</td>
                 </tr>
               )
             })}
-            {!list.length && <tr><td colSpan={4} className="empty">ยังไม่มีนักเรียนในชั้น {level}</td></tr>}
+            {!list.length && <tr><td colSpan={5} className="empty">ยังไม่มีนักเรียนในชั้น {level}</td></tr>}
           </tbody>
         </table>
       </div>

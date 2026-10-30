@@ -28,17 +28,17 @@ export default function Catalog() {
     } finally { setBusy(false) }
   }
 
-  if (!openYear) return <div className="card empty">ยังไม่มีปีการศึกษาที่เปิดใช้งาน</div>
   const allOn = rows.length > 0 && rows.every((c) => openSet.has(c.code))
 
   return (
     <div className="stack">
+      {!openYear && <div className="card tplbar"><b>ยังไม่กำหนดปีการศึกษา</b> — ดูรายวิชาได้ แต่เปิดสอนหรือเลือกวิชาไม่ได้ (แอดมินหลักเปิดปีการศึกษาได้ที่เมนู "ปีการศึกษา")</div>}
       <div className="row">
         {LEVELS.map((l) => <button key={l} className="chip" aria-pressed={level === l} onClick={() => setLevel(l)}>{l}</button>)}
       </div>
       <div className="row">
         <span className="muted small">{isPri(level) ? 'ประถมเก็บทั้งปี (ภาคเรียนละ 50 รวม 100)' : `ภาคเรียนที่ ${term}`}</span>
-        {admin && <button className="btn sm alt" disabled={busy} onClick={() => apply(rows.map((c) => c.code), !allOn)}>
+        {admin && <button className="btn sm alt" disabled={busy || !openYear} onClick={() => apply(rows.map((c) => c.code), !allOn)}>
           {allOn ? 'ยกเลิกทั้งชั้นนี้' : 'เลือกทั้งหมดของชั้นนี้'}
         </button>}
       </div>
@@ -48,7 +48,7 @@ export default function Catalog() {
           <tbody>
             {rows.map((c) => (
               <tr key={c.code}>
-                {admin && <td><input type="checkbox" checked={openSet.has(c.code)} disabled={busy}
+                {admin && <td><input type="checkbox" checked={openSet.has(c.code)} disabled={busy || !openYear}
                   aria-label={`เปิดสอน ${c.name}`} onChange={(e) => apply([c.code], e.target.checked)} /></td>}
                 <td>{c.code}</td><td>{c.name}</td>
                 {!admin && <td>{openSet.has(c.code) ? <span className="pill p-good">เปิดสอน</span> : <span className="pill p-warn">ยังไม่เปิด</span>}</td>}

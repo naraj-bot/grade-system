@@ -3,6 +3,7 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { useAuth } from '../auth'
 import { useData } from '../data'
+import Catalog from './Catalog'
 import { useRegs } from '../lib/useRegs'
 import { notify } from '../lib/notify'
 import { LEVELS, REG_STATUS, isAdminRole } from '../lib/constants'
@@ -131,7 +132,7 @@ export default function Registration() {
   const { user } = useAuth()
   const { openYear } = useData()
   const regs = useRegs()
-  if (!openYear) return <div className="card empty">ยังไม่มีปีการศึกษาที่เปิดใช้งาน</div>
+  if (!openYear) return <div className="stack"><div className="card tplbar"><b>ยังไม่กำหนดปีการศึกษา</b> — ลงทะเบียนสอนยังไม่ได้ ดูรายวิชาทั้งหมดได้ด้านล่าง (แอดมินหลักเปิดปีการศึกษาได้ที่เมนู "ปีการศึกษา")</div><Catalog /></div>
   if (!isAdminRole(user.role)) return <TeacherView regs={regs} />
   return (
     <div className="stack">

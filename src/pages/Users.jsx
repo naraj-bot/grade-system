@@ -36,6 +36,9 @@ export default function Users() {
   const [form, setForm] = useState({ username: '', name: '', role: 'teacher', tempPassword: genPassword() })
   const [msg, setMsg] = useState('')
   const [slips, setSlips] = useState([])
+  const [bulk, setBulk] = useState('')
+  const [bulkRole, setBulkRole] = useState('teacher')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     const q = isSuper
@@ -53,6 +56,29 @@ export default function Users() {
       setMsg(`สร้างบัญชี ${form.username} แล้ว รหัสเริ่มต้น: ${form.tempPassword} (ต้องเปลี่ยนเมื่อเข้าครั้งแรก)`)
       setForm({ username: '', name: '', role: 'teacher', tempPassword: genPassword() })
     } catch (err) { setMsg(err.message) }
+  }
+
+  // เพิ่มหลายคน: บรรทัดละคน "ชื่อผู้ใช้ ชื่อ-สกุล" (คั่นด้วยแท็บ จุลภาค หรือเว้นวรรค) ถ้าไม่ใส่ชื่อผู้ใช้ ระบบตั้งให้เป็น kru01, kru02, ...
+  const createBulk = async () => {
+    const taken = new Set(list.map((u) => u.username))
+    let n = 0
+    const nextAuto = () => { let u; do { u = 'kru' + String(++n).padStart(2, '0') } while (taken.has(u)); taken.add(u); return u }
+    const rows = bulk.split('\n').map((x) => x.trim()).filter(Boolean).map((l) => {
+      const m = l.match(/^([A-Za-z][A-Za-z0-9._-]{2,})\s*[\t,;]\s*(.+)$/) || l.match(/^([A-Za-z][A-Za-z0-9._-]{2,})\s+(.+)$/)
+      return m ? { username: m[1].toLowerCase(), name: m[2].trim() } : { username: nextAuto(), name: l }
+    })
+    if (!rows.length) return
+    setBusy(true); setMsg('')
+    const ok = [], bad = []
+    for (const r of rows) {
+      const tempPassword = genPassword()
+      try { await callApi({ action: 'create', username: r.username, name: r.name, role: isSuper ? bulkRole : 'teacher', tempPassword }); ok.push({ name: r.name, username: r.username, pw: tempPassword }) }
+      catch (err) { bad.push(`${r.username} (${err.message})`) }
+    }
+    setSlips((x) => [...x, ...ok])
+    setMsg(`สร้างบัญชีแล้ว ${ok.length} จาก ${rows.length} คน${bad.length ? ' · ไม่สำเร็จ: ' + bad.join(', ') : ''}${ok.length ? ' · กด "พิมพ์ใบรหัสผ่านเริ่มต้น" เพื่อเก็บรหัสไปแจกครู' : ''}`)
+    if (!bad.length) setBulk('')
+    setBusy(false)
   }
 
   const reset = async (u) => {
@@ -80,6 +106,17 @@ export default function Users() {
         <input value={form.tempPassword} onChange={(e) => setForm({ ...form, tempPassword: e.target.value })} />
         <button className="btn">เพิ่มผู้ใช้</button>
       </form>
+      <details className="card">
+        <summary><b>เพิ่มหลายคนพร้อมกัน</b></summary>
+        <div className="stack" style={{ marginTop: 8 }}>
+          <div className="small muted">พิมพ์บรรทัดละคน เช่น <code>somchai  ครูสมชาย ใจดี</code> หรือใส่แค่ชื่อ-สกุล ระบบจะตั้งชื่อผู้ใช้ให้ (kru01, kru02, ...) และสุ่มรหัสผ่านเริ่มต้นให้ทุกคน</div>
+          <textarea rows={6} value={bulk} onChange={(e) => setBulk(e.target.value)} placeholder={'somchai  ครูสมชาย ใจดี\nsomying  ครูสมหญิง รักเรียน\nครูมานะ ตั้งใจ'} />
+          <div className="row">
+            {isSuper && <select value={bulkRole} onChange={(e) => setBulkRole(e.target.value)}><option value="teacher">ครูผู้สอน</option><option value="schooladmin">แอดมินโรงเรียน</option></select>}
+            <button className="btn" disabled={busy || !bulk.trim()} onClick={createBulk}>{busy ? 'กำลังสร้าง...' : 'สร้างบัญชีทั้งหมด'}</button>
+          </div>
+        </div>
+      </details>
       {msg && <p className="notice">{msg}</p>}
       {slips.length > 0 && (
         <div className="row">

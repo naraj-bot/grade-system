@@ -13,6 +13,7 @@ const PATHS = {
  "school": "<path d=\"M3 10l9-6 9 6M5 10v9h14v-9M9 19v-5h6v5\"/>",
  "pen": "<path d=\"M4 20l1-4L17 4l3 3L8 19zM14 7l3 3\"/>",
  "help": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1.1-1.5 2.2M12 17h.01\"/>",
+ "out": "<path d=\"M9 4H5a2 2 0 00-2 2v12a2 2 0 002 2h4M16 8l4 4-4 4M20 12H9\"/>",
  "more": "<circle cx=\"5\" cy=\"12\" r=\"1.3\"/><circle cx=\"12\" cy=\"12\" r=\"1.3\"/><circle cx=\"19\" cy=\"12\" r=\"1.3\"/>"
 }
 

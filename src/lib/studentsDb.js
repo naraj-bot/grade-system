@@ -21,7 +21,7 @@ export async function addStudents(items, students, by, logText) {
     if (!no || (used[x.level] && used[x.level].has(no))) no = ++max[x.level]
     else max[x.level] = Math.max(max[x.level], no)
     ;(used[x.level] ||= new Set()).add(no)
-    return { name: x.name, level: x.level, no, status: 'active', createdAt: Date.now() }
+    return { name: x.name, level: x.level, no, status: 'active', createdAt: Date.now(), ...(x.sid ? { sid: String(x.sid) } : {}) }
   })
   let first = true
   for (const part of chunk(rows)) {
@@ -38,10 +38,11 @@ export async function updateStudent(old, next, by) {
   if (old.name !== next.name) ch.push(`ชื่อ "${old.name}" → "${next.name}"`)
   if (old.no !== next.no) ch.push(`เลขที่ ${old.no} → ${next.no}`)
   if (old.level !== next.level) ch.push(`ชั้น ${old.level} → ${next.level}`)
+  if ((old.sid || '') !== (next.sid || '')) ch.push(`เลขประจำตัว ${old.sid || '-'} → ${next.sid || '-'}`)
   if ((old.status || 'active') !== next.status) ch.push(`สถานะ ${STUDENT_STATUS[old.status || 'active']} → ${STUDENT_STATUS[next.status]}`)
   if (!ch.length) return false
   const b = writeBatch(db)
-  b.update(doc(db, 'students', old.id), { name: next.name, no: next.no, level: next.level, status: next.status })
+  b.update(doc(db, 'students', old.id), { name: next.name, no: next.no, level: next.level, status: next.status, sid: next.sid || '' })
   b.set(logRef(), logData(by, `แก้ไข ${old.name}: ${ch.join(', ')}`))
   await b.commit()
   return true

@@ -58,8 +58,8 @@ const reg = (type, fn) => LISTENERS.push([type, (e) => { try { fn(e) } catch (er
 const P = {}
 function grade(x){return x>=80?4:x>=75?3.5:x>=70?3:x>=65?2.5:x>=60?2:x>=55?1.5:x>=50?1:0;}
 const gp=g=>`<span class="pill ${g>=3?'p-good':g>=1?'p-gold':'p-bad'}">${g}</span>`;
-function evMiss(code,T,R){const st=S.ev[code+'|'+T]||{};return R.filter(r=>!EVK.every(([k,,,it])=>evOverall((st[r.s.id]||{})[k],it.length))).length;}
-function myCodes(){const own=()=>S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return x&&(isPri(x.level)||x.term===S.term);});
+function evMiss(code,T,R){if(S.tpl)return 0;const st=S.ev[code+'|'+T]||{};return R.filter(r=>!EVK.every(([k,,,it])=>evOverall((st[r.s.id]||{})[k],it.length))).length;}
+function myCodes(){if(S.tpl)return [...new Set(CAT.filter(c=>isPri(c.level)||c.term===S.term).map(c=>c.code))];const own=()=>S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return x&&(isPri(x.level)||x.term===S.term);});
   const mine=[...new Set(own())];if(isAdmin()&&!S.allSubj&&mine.length)return mine;
   return [...new Set(isAdmin()?CAT.filter(c=>S.openSubj.has(c.code)&&(isPri(c.level)||c.term===S.term)).map(c=>c.code):S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return isPri(x.level)||x.term===S.term;}))];}
 const TK=(code,T)=>{T=T||S.term;const c=CAT.find(x=>x.code===code);return(c&&isPri(c.level)&&T===1)?code+'~1':code;};
@@ -183,7 +183,8 @@ P.p5=()=>{
   <div class="small" style="text-align:center"><span class="lg"></span> ผ่านเกณฑ์ (ระดับ 1 – 4) &nbsp;&nbsp; <span class="lg fx"></span> ต้องแก้ไขผลการเรียน (0 ร มส)</div>`;
  const hd=t=>`<h3 style="text-align:center;margin:4px 0">${t}</h3>`;
  const rot=t=>`<th class="rot"><span class="rv">${t}</span></th>`;
- const stuCells=r=>`<td class="num">${r.s.no}</td><td>${esc(r.s.name)}</td>`;
+ const hasSid=R.some(r=>r.s.sid),SID=rs=>hasSid?`<th${rs?` rowspan="${rs}"`:''}>เลขประจำตัว</th>`:'';
+ const stuCells=r=>`<td class="num">${r.s.no}</td>${hasSid?`<td class="num">${esc(r.s.sid||'')}</td>`:''}<td>${esc(r.s.name)}</td>`;
  const sTeach=sg.t?S.sigs[tk]:null,sHead=sg.head?hd0.sig:null,sMeas=sg.measure?off.measure.sig:null,sAcad=sg.acad?off.acad.sig:null,sDir=(sg.dir==='ok'||sg.dir==='no')?off.dir.sig:null;
  /* หน้าสรุปและลงนาม */
  const info=`<div class="pg"><div style="text-align:center"><img src="${LOGO}" alt="" style="width:140px;height:140px;object-fit:contain"></div>${hd('แบบบันทึกผลการพัฒนาคุณภาพผู้เรียน (ปพ.5)')}<div style="text-align:center">ระดับ${lvName}<br><b>${esc(sc.name)}</b> · ${esc(sc.area)}</div>
@@ -211,7 +212,7 @@ P.p5=()=>{
   ${pri?`<div class="small">ประถมเก็บคะแนนภาคเรียนละ ${F.base===100?'100 แล้วระบบย่อเหลือ 50':'50'} · รวมทั้งปี 100 คะแนน · เวลาเรียนทั้งปี ${H*2} ชั่วโมง</div>`:''}</div>`};
  /* คะแนนย่อย (แนวนอน) */
  const subF=(T,cfg,G,R)=>`<div class="pg">${ph()}${hd('บันทึกคะแนนย่อยระหว่างเรียน'+(pri?` ภาคเรียนที่ ${T}`:''))}
-  <div class="tw" style="font-size:${cfg.cols.length>12?'.68em':cfg.cols.length>8?'.8em':'1em'}"><table><thead><tr><th rowspan="3">เลขที่</th><th rowspan="3">ชื่อ - สกุล</th>${G.map(g=>g.idx.length>1?`<th colspan="${g.idx.length+1}">${esc(g.label)}</th>`:`<th rowspan="2">${esc(cfg.cols[g.idx[0]].n)}</th>`).join('')}${G.length>1?'<th rowspan="3">รวม<br>ระหว่างเรียน</th>':''}</tr>
+  <div class="tw" style="font-size:${cfg.cols.length>12?'.68em':cfg.cols.length>8?'.8em':'1em'}"><table><thead><tr><th rowspan="3">เลขที่</th>${SID(3)}<th rowspan="3">ชื่อ - สกุล</th>${G.map(g=>g.idx.length>1?`<th colspan="${g.idx.length+1}">${esc(g.label)}</th>`:`<th rowspan="2">${esc(cfg.cols[g.idx[0]].n)}</th>`).join('')}${G.length>1?'<th rowspan="3">รวม<br>ระหว่างเรียน</th>':''}</tr>
   <tr>${G.map(g=>g.idx.length>1?g.idx.map(i=>`<th>${esc(cfg.cols[i].n)}</th>`).join('')+'<th>รวม</th>':'').join('')}</tr>
   <tr>${G.map(g=>g.idx.length>1?g.idx.map(i=>`<th>${cfg.cols[i].max}</th>`).join('')+`<th>${g.max}</th>`:`<th>${g.max}</th>`).join('')}</tr></thead><tbody>
   ${R.map(r=>`<tr>${stuCells(r)}${G.map(g=>g.idx.map(i=>`<td class="num">${r.v.c[i]==null||r.v.c[i]===''?'-':r.v.c[i]}</td>`).join('')+(g.idx.length>1?`<td class="num"><b>${f1(gsum(r,g))}</b></td>`:'')).join('')}${G.length>1?`<td class="num"><b>${f1(r.mid)}</b></td>`:''}</tr>`).join('')}</tbody></table></div></div>`;
@@ -222,18 +223,18 @@ P.p5=()=>{
   const heads=[...G.map(g=>[esc(g.label),g.max]),...(multi?[['รวมระหว่างเรียน',F.mid]]:[]),['สอบปลายภาค',F.fin],[pri?`รวมภาคเรียนที่ ${T}${scl?' (เก็บ 100)':''}`:'รวม',F.base],...(scl?[['ย่อเหลือ 50 คะแนน',50]]:[])];
   const note=pri?`วิธีคิด: คะแนนระหว่างเรียน (${F.mid}) + ปลายภาค (${F.fin}) = ${F.base} คะแนน${scl?' → ย่อเหลือ 50':''} · ภาคเรียนที่ ${T} ยังไม่ตัดเกรด ตัดเกรดรวมทั้งปีในหน้าบันทึกผลการเรียนรวม`:`วิธีคิด: คะแนนระหว่างเรียน (${F.mid}) + ปลายภาค (${F.fin}) = 100 แล้วตัดเกรด`;
   return `<div class="pg">${ph()}${hd('บันทึกผลการเรียน'+(pri?` ภาคเรียนที่ ${T}`:''))}
-  <div class="tw"><table><thead><tr><th rowspan="2">เลขที่</th><th rowspan="2">ชื่อ - สกุล</th>${heads.map(h=>rot(h[0])).join('')}${showG?'<th rowspan="2">ระดับ<br>ผลการ<br>เรียน</th>':''}</tr>
+  <div class="tw"><table><thead><tr><th rowspan="2">เลขที่</th>${SID(2)}<th rowspan="2">ชื่อ - สกุล</th>${heads.map(h=>rot(h[0])).join('')}${showG?'<th rowspan="2">ระดับ<br>ผลการ<br>เรียน</th>':''}</tr>
   <tr>${heads.map(h=>`<th>${h[1]}</th>`).join('')}</tr></thead><tbody>
   ${R.map(r=>`<tr>${stuCells(r)}${G.map(g=>`<td class="num">${f1(gsum(r,g)).replace('-','')}</td>`).join('')}${multi?`<td class="num">${f1(r.mid).replace('-','')}</td>`:''}<td class="num">${r.fin==null?'':r.fin}</td><td class="num">${f1(r.tot).replace('-','')}</td>${scl?`<td class="num">${f1(r.cur).replace('-','')}</td>`:''}${showG?`<td class="num"><b>${r.g==null?'-':r.g}</b></td>`:''}</tr>`).join('')}</tbody></table></div>
   <div class="small">${note}</div></div>`;};
  const resYf=()=>`<div class="pg">${ph()}${hd('บันทึกผลการเรียนรวมทั้งปี')}
-  <div class="tw"><table><thead><tr><th rowspan="2">เลขที่</th><th rowspan="2">ชื่อ - สกุล</th><th>ภาคเรียนที่ 1</th><th>ภาคเรียนที่ 2</th><th>รวมทั้งปี</th><th rowspan="2">ระดับ<br>ผลการ<br>เรียน</th></tr><tr><th>50</th><th>50</th><th>100</th></tr></thead><tbody>
+  <div class="tw"><table><thead><tr><th rowspan="2">เลขที่</th>${SID(2)}<th rowspan="2">ชื่อ - สกุล</th><th>ภาคเรียนที่ 1</th><th>ภาคเรียนที่ 2</th><th>รวมทั้งปี</th><th rowspan="2">ระดับ<br>ผลการ<br>เรียน</th></tr><tr><th>50</th><th>50</th><th>100</th></tr></thead><tbody>
   ${R.map(r=>`<tr>${stuCells(r)}<td class="num">${f1(r.pr).replace('-','')}</td><td class="num">${f1(r.cur).replace('-','')}</td><td class="num">${f1(r.sum).replace('-','')}</td><td class="num"><b>${r.g==null?'-':r.g}</b></td></tr>`).join('')}</tbody></table></div>
   <div class="small">รวมทั้งปี = ภาคเรียนที่ 1 (50) + ภาคเรียนที่ 2 (50) = 100 คะแนน แล้วตัดเกรด · เวลาเรียนนับรวมทั้งปี ต้องไม่ต่ำกว่าร้อยละ 80</div></div>`;
  const resP=t2?resF(1,cfg1,F1,G1,R1,false)+resF(2,cfg,F,G,R,false)+resYf():resF(S.term,cfg,F,G,R,true);
  /* ผลการประเมิน 3 หน้า */
  const evPage=([k,title,,items])=>`<div class="pg">${ph()}${hd(title)}
-  <div class="tw"><table><thead><tr><th>เลขที่</th><th>ชื่อ - สกุล</th>${items.map((t,i)=>rot(`${i+1}. ${t}`)).join('')}<th class="rot"><span class="rv">สรุปผล</span></th></tr></thead><tbody>
+  <div class="tw"><table><thead><tr><th>เลขที่</th>${SID()}<th>ชื่อ - สกุล</th>${items.map((t,i)=>rot(`${i+1}. ${t}`)).join('')}<th class="rot"><span class="rv">สรุปผล</span></th></tr></thead><tbody>
   ${R.map(r=>`<tr>${stuCells(r)}${items.map((_,i)=>`<td class="num">${((evS[r.s.id]||{})[k]||[])[i]??''}</td>`).join('')}<td class="num">${evLab(r,k,items.length)||''}</td></tr>`).join('')}</tbody></table></div>
   <div class="small">เกณฑ์: 3 = ดีเยี่ยม · 2 = ดี · 1 = ผ่าน · 0 = ไม่ผ่าน</div></div>`;
  const evP=evOn?EVK.map(evPage).join('<div class="pgl">ผลการประเมิน</div>'):'';
@@ -245,7 +246,7 @@ P.p5=()=>{
   <div style="width:min(300px,100%);margin-left:auto">${bl(tn,'ครูผู้สอน',sTeach)}</div></div>`;
  /* แก้ไขผลการเรียน */
  const fixP=graded?`<div class="pg">${ph()}${hd('บันทึกการแก้ไขผลการเรียน (0, ร, มส)')}
-  <div class="tw"><table><thead><tr><th>เลขที่</th><th>ชื่อ - สกุล</th><th>ผลเดิม</th><th>สาเหตุ / วิธีการแก้ไข</th><th>ผลหลังแก้</th><th>วันที่</th><th>ลงชื่อครูผู้สอน</th></tr></thead><tbody>${R.map(r=>{const x=fix[r.s.id]||{};return `<tr>${stuCells(r)}<td class="num">${r.g==null?'-':r.g}</td><td>${esc(x.why||'')}</td><td class="num">${esc(x.after||'')}</td><td class="num">${x.date?thDate(x.date).replace('วันที่ ',''):''}</td><td class="num">${x.after&&sTeach?`<img class="sigimg sm" src="${sTeach}" alt="">`:''}</td></tr>`}).join('')}</tbody></table></div></div>`:'';
+  <div class="tw"><table><thead><tr><th>เลขที่</th>${SID()}<th>ชื่อ - สกุล</th><th>ผลเดิม</th><th>สาเหตุ / วิธีการแก้ไข</th><th>ผลหลังแก้</th><th>วันที่</th><th>ลงชื่อครูผู้สอน</th></tr></thead><tbody>${R.map(r=>{const x=fix[r.s.id]||{};return `<tr>${stuCells(r)}<td class="num">${r.g==null?'-':r.g}</td><td>${esc(x.why||'')}</td><td class="num">${esc(x.after||'')}</td><td class="num">${x.date?thDate(x.date).replace('วันที่ ',''):''}</td><td class="num">${x.after&&sTeach?`<img class="sigimg sm" src="${sTeach}" alt="">`:''}</td></tr>`}).join('')}</tbody></table></div></div>`:'';
  /* คำชี้แจงเกณฑ์ */
  const crit=`<div class="pg">${ph().replace(/หน้า \d+/,'ท้ายเล่ม')}${hd('คำชี้แจงเกณฑ์การวัดและประเมินผล')}
   <b>1. เกณฑ์การตัดสินระดับผลการเรียน</b>
@@ -259,7 +260,7 @@ P.p5=()=>{
   <div style="text-align:center;margin-top:10px;border-top:1px solid #444;padding-top:8px"><img src="${LOGO}" alt="" style="width:100px;height:100px;object-fit:contain"><br><b>${esc(sc.name)}</b><br>${esc(sc.area)}<br><span class="small">${c.code} ${esc(c.name)} · ชั้น ${c.level} · ปีการศึกษา ${yr}</span></div></div>`;
  const L=(t,h)=>h?`${h}<div class="pgl">${t}</div>`:'';
  /* ตรวจความครบถ้วน */
- const evFull=!evOn||EVK.every(([k,,,it])=>R.every(r=>evLab(r,k,it.length))),evLock=evOn&&!evFull;
+ const evFull=!evOn||EVK.every(([k,,,it])=>R.every(r=>evLab(r,k,it.length))),evLock=!S.tpl&&evOn&&!evFull;
  const chk=[
   ['คะแนนครบทุกคน (ระหว่างเรียนและปลายภาค)',R.every(r=>r.tot!=null),'scores'],
   ['คำอธิบายรายวิชา (ข้อความหรือภาพ)',!!(meta.desc||meta.img),null],
@@ -413,7 +414,7 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
   s:'หมายเหตุ: มัธยมตัดสินผลการเรียนทุกภาคเรียน · นักเรียนต้องมีเวลาเรียนไม่ต่ำกว่าร้อยละ 80 · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน'}[M];
  return `<div class="pg rp"><div class="pj">ปพ.6</div>
  <div class="rhd"><img src="${LOGO}" alt=""><b>แบบรายงานผลการพัฒนาคุณภาพผู้เรียนรายบุคคล</b><b>ภาคเรียนที่ ${T}${M==='p2'?' (ประกาศผลทั้งปี)':''} ปีการศึกษา ${yr} &nbsp; ${esc(sc.name)}</b><span>${esc(sc.area)}</span></div>
- <div class="rn"><div class="lbl">ข้อมูลนักเรียน</div><div class="rl"><span><b>ชื่อ</b> ${esc(fn)}</span><span><b>สกุล</b> ${esc(sur)}</span><span><b>ชั้น</b> ${L}</span><span><b>เลขที่</b> ${s.no}</span></div></div>
+ <div class="rn"><div class="lbl">ข้อมูลนักเรียน</div><div class="rl"><span><b>ชื่อ</b> ${esc(fn)}</span><span><b>สกุล</b> ${esc(sur)}</span><span><b>ชั้น</b> ${L}</span><span><b>เลขที่</b> ${s.no}</span>${s.sid?`<span><b>เลขประจำตัว</b> ${esc(s.sid)}</span>`:''}</div></div>
  <div class="tw"><table class="rt2"><thead>${head}</thead><tbody>
  ${grp('วิชาพื้นฐาน',rows.filter(x=>!x.add))}${grp('วิชาเพิ่มเติม',rows.filter(x=>x.add))}
  ${avgRow}</tbody></table></div>
@@ -469,7 +470,7 @@ function homeroomCard() {
 
 
 /* ---------- สรุปผลรายห้อง ---------- */
-function sumLevels() { return isAdmin() ? LEVELS : LEVELS.filter((l) => (HOMEROOM[l] || []).includes(S.role)) }
+function sumLevels() { return (S.tpl || isAdmin()) ? LEVELS : LEVELS.filter((l) => (HOMEROOM[l] || []).includes(S.role)) }
 function sumData(L) {
   const D = rptData(L, S.term), M = D.mode
   const clubOf = (s) => { const m = Object.values(S.members).find((m) => (m.ids || []).includes(s.id)); return m ? ((m.v || {})[s.id] || '-') : '-' }
@@ -594,7 +595,7 @@ async function wordBook(c) {
 function downloadReport(which) {
   const L = S.rpLevel || 'ป.3', D = rptData(L), s = D.stus.find((x) => x.id === S.rpStu) || D.stus[0]
   if (!s) return
-  if (which === 'all') exportPdf(rname(L, null, D.T).replace(/\.pdf$/, ''), D.stus.map((x) => rptPage(L, x, D)).join(''))
+  if (which === 'all' && !S.tpl) exportPdf(rname(L, null, D.T).replace(/\.pdf$/, ''), D.stus.map((x) => rptPage(L, x, D)).join(''))
   else exportPdf(rname(L, s, D.T).replace(/\.pdf$/, ''), rptPage(L, s, D))
 }
 
@@ -659,7 +660,8 @@ function stickAll() { stickNames() }
 function render() {
   const v = $('#view'); if (!v) return
   if (!ready()) { v.innerHTML = '<div class="card empty">กำลังโหลดข้อมูล…</div>'; return }
-  try { v.innerHTML = P[S.page]() } catch (err) { console.error(err); v.innerHTML = `<div class="card lock">แสดงหน้านี้ไม่ได้: ${esc(err.message)}</div>`; return }
+  try { v.innerHTML = (S.tpl ? TPL_BAR : '') + P[S.page]() } catch (err) { console.error(err); v.innerHTML = `<div class="card lock">แสดงหน้านี้ไม่ได้: ${esc(err.message)}</div>`; return }
+  if (S.tpl) v.querySelectorAll('input,select,textarea').forEach((el) => { if (!el.matches('#sub,#rpst,#allsubj')) el.disabled = true })
   stickNames(); initSig(); persist()
 }
 function softRender() {
@@ -670,12 +672,25 @@ function softRender() {
 
 /* ---------- บันทึก/ซิงก์กับ Firestore ---------- */
 const st8 = { work: false, settings: false }
+const TPL = '....'
+const TPL_BAR = '<div class="card tplbar"><b>ยังไม่กำหนดปีการศึกษา</b> — ดูหน้าจอและดาวน์โหลดแบบฟอร์มเปล่าได้ แต่กรอกหรือแก้ไขข้อมูลไม่ได้ (แอดมินหลักเปิดปีการศึกษาได้ที่เมนู "ปีการศึกษา")</div>'
+const tplGate = (e) => {
+  const v = $('#view'); if (!S.tpl || !v || !v.contains(e.target)) return
+  const t = e.target
+  if (e.type === 'click') {
+    const b = t.closest('button,[data-act],[data-rl],[data-go],[data-term]'); if (!b) return
+    if (b.matches('[data-go],[data-term],[data-sumlv],[data-actlv],[data-clublv],[data-rl],[data-evk],[data-act=dl],[data-act=rdl],[data-act=sumdl]')) return
+    e.stopImmediatePropagation(); e.preventDefault(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้')
+  } else if (!t.matches('#sub,#rpst,#allsubj')) { e.stopImmediatePropagation(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้') }
+}
+const tplBlank = () => LEVELS.flatMap((L) => Array.from({ length: 40 }, (_, i) => ({ id: '_' + L + '_' + (i + 1), name: '', level: L, no: i + 1, status: 'active' })))
 const ready = () => st8.work && st8.settings && S.year && CAT.length
 const lastJson = {}
 const metaOfId = {}
 const pending = {}
 const timers = {}
 let unsubs = []
+let unsubsS = []
 const docId = (b, sub) => `${S.year}~${b}~${encodeURIComponent(sub).replace(/\./g, '%2E')}`
 function cleaned(b, d) {
   if (b === 'cfg' && d.cols && d.cols.length === 1 && d.cols[0].n === 'คะแนนเก็บระหว่างภาค' && d.scale === 100 && d.hours === 40 && !d.ratio) return {}
@@ -684,7 +699,7 @@ function cleaned(b, d) {
   return d
 }
 function persist() {
-  if (!st8.work || !CTX) return
+  if (S.tpl || !st8.work || !CTX) return
   for (const b of BUCKETS) {
     for (const sub of Object.keys(S[b])) {
       const id = docId(b, sub), j = JSON.stringify(cleaned(b, S[b][sub]))
@@ -711,7 +726,7 @@ function report(err) { console.error(err); toast('บันทึกไม่ส
 let lastSettings = null
 function settingsJson() { return JSON.stringify({ school: S.school, homeroom: HOMEROOM, guidance: S.guidance, names: NAMES }) }
 function persistSettings() {
-  if (!isAdmin() || !st8.settings) return
+  if (S.tpl || !isAdmin() || !st8.settings) return
   TEACHERS.forEach((t) => (NAMES[t.uid] = t.name))
   const j = settingsJson(); if (j === lastSettings) return
   lastSettings = j
@@ -719,7 +734,7 @@ function persistSettings() {
 }
 let lastSig
 function persistSig() {
-  if (!st8.sigsLoaded) return
+  if (S.tpl || !st8.sigsLoaded) return
   const cur = S.sigs[S.role] || null
   if (cur === lastSig) return
   lastSig = cur
@@ -755,12 +770,12 @@ function subscribeAll() {
   }, report))
 }
 function subscribeStatic() {
-  unsubs.push(onSnapshot(doc(db, 'settings', 'school'), (s) => {
+  unsubsS.push(onSnapshot(doc(db, 'settings', 'school'), (s) => {
     if (s.exists() && !s.metadata.hasPendingWrites) { lastSettings = s.data().json; applySettings(s.data().json) }
     else if (!s.exists()) lastSettings = null
     st8.settings = true; softRender()
   }, report))
-  unsubs.push(onSnapshot(collection(db, 'sigs'), (snap) => {
+  unsubsS.push(onSnapshot(collection(db, 'sigs'), (snap) => {
     snap.docs.forEach((d) => (S.sigs[d.id] = d.data().data))
     snap.docChanges().forEach((ch) => { if (ch.type === 'removed') delete S.sigs[ch.doc.id] })
     lastSig = S.sigs[S.role] || null; st8.sigsLoaded = true; softRender()
@@ -774,23 +789,32 @@ export function engineUpdate(ctx, page) {
   CTX = ctx
   S.role = ctx.user.uid
   S.term = ctx.term
+  S.tpl = !!ctx.template
   S.page = PAGES_OK.includes(page) ? page : 'scores'
   CAT = ctx.catalog.map((c) => ({ level: c.level, term: isPri(c.level) ? 0 : +c.term, code: c.code, name: c.name }))
   const rk = (s) => ({ ...s, st: (s.status || 'active') === 'active' ? undefined : s.status })
-  STU = ctx.students.map(rk).sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || (a.no || 0) - (b.no || 0))
-  S.openSubj = ctx.openSet
-  S.regs = ctx.regs.map((r) => ({ id: r.id, t: r.uid, name: r.name, codes: r.codes, status: r.status, msg: r.msg, term: r.term }))
+  STU = (S.tpl ? tplBlank() : ctx.students).map(rk).sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || (a.no || 0) - (b.no || 0))
+  S.openSubj = S.tpl ? new Set(CAT.map((c) => c.code)) : ctx.openSet
+  S.regs = (S.tpl ? [] : ctx.regs).map((r) => ({ id: r.id, t: r.uid, name: r.name, codes: r.codes, status: r.status, msg: r.msg, term: r.term }))
   TEACHERS = ctx.teachers || []
   if (ctx.user.role === 'superadmin') Object.assign(NAMES, {})
   rebuildUsers()
   if (!started) { started = true; subscribeStatic(); LISTENERS.forEach(([t, f]) => document.addEventListener(t, f)); window.addEventListener('resize', stickAll) }
-  if (S.year !== ctx.year) { S.year = ctx.year; subscribeAll() }
+  if (S.tpl) {
+    if (S.year !== TPL) { unsubs.forEach((f) => f()); unsubs = []; Object.keys(lastJson).forEach((k) => delete lastJson[k]); Object.keys(metaOfId).forEach((k) => delete metaOfId[k]); Object.keys(pending).forEach((k) => delete pending[k]); BUCKETS.forEach((b) => (S[b] = {})); S.year = TPL }
+    st8.work = true
+    document.addEventListener('click', tplGate, true); document.addEventListener('input', tplGate, true); document.addEventListener('change', tplGate, true)
+  } else {
+    document.removeEventListener('click', tplGate, true); document.removeEventListener('input', tplGate, true); document.removeEventListener('change', tplGate, true)
+    if (S.year !== ctx.year) { S.year = ctx.year; subscribeAll() }
+  }
   if (!S.scCode || !CAT.find((c) => c.code === S.scCode)) S.scCode = null
   render()
 }
 export function engineStop() {
-  unsubs.forEach((f) => f()); unsubs = []
+  unsubs.forEach((f) => f()); unsubs = []; unsubsS.forEach((f) => f()); unsubsS = []
+  ;['click', 'input', 'change'].forEach((t) => document.removeEventListener(t, tplGate, true))
   LISTENERS.forEach(([t, f]) => document.removeEventListener(t, f)); window.removeEventListener('resize', stickAll)
   Object.keys(timers).forEach((id) => { clearTimeout(timers[id]); flush(id) })
-  started = false; CTX = null; S.year = 0; st8.work = false; st8.settings = false; st8.sigsLoaded = false
+  started = false; CTX = null; S.year = 0; S.tpl = false; st8.work = false; st8.settings = false; st8.sigsLoaded = false
 }

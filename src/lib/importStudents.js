@@ -100,7 +100,7 @@ export async function readXlsx(buf) {
 export function mapRows(raw, defaultLevel, activeStudents) {
   let rows = raw.map((r) => Array.from({ length: r.length }, (_, i) => String(r[i] == null ? '' : r[i]).trim()))
     .filter((r) => r.some((x) => x))
-  const HEAD = /^(เลขที่|ลำดับ|ที่|คำนำหน้า|ชื่อ|ชื่อ\s*-?\s*(นาม)?สกุล|ชื่อจริง|นามสกุล|สกุล|ชั้น|ระดับชั้น|ชั้นเรียน|เลขประจำตัว.*)$/
+  const HEAD = /^(เลขประจำตัว(นักเรียน)?|รหัสนักเรียน|เลขที่|ลำดับ|ที่|คำนำหน้า|ชื่อ|ชื่อ\s*-?\s*(นาม)?สกุล|ชื่อจริง|นามสกุล|สกุล|ชั้น|ระดับชั้น|ชั้นเรียน|เลขประจำตัว.*)$/
   const hi = rows.slice(0, 8).findIndex((r) => r.filter((x) => HEAD.test(x)).length >= 2 || r.some((x) => /^ชื่อ\s*-?\s*(นาม)?สกุล$/.test(x)))
   const M = {}
   let body = rows, hdr = false
@@ -112,23 +112,25 @@ export function mapRows(raw, defaultLevel, activeStudents) {
       else if (/ชื่อ.*สกุล/.test(h)) M.full = i
       else if (/นามสกุล|^สกุล$/.test(h)) M.last = i
       else if (/^(ชื่อ|ชื่อจริง|ชื่อตัว)$/.test(h)) M.first = i
+      else if (/เลขประจำตัว|รหัสนักเรียน|รหัสประจำตัว/.test(h)) M.sid = i
       else if (/^(เลขที่|ลำดับ|ที่)$/.test(h)) M.no = i
       else if (/^(ชั้น|ระดับชั้น|ชั้นเรียน)/.test(h)) M.lv = i
     })
   }
   const out = body.map((r) => {
-    let name, no = null, level = defaultLevel
+    let name, no = null, level = defaultLevel, sid = ''
     if (hdr) {
       name = M.full != null ? r[M.full] : (r[M.pre] || '') + (r[M.first] || '') + (r[M.last] ? ' ' + r[M.last] : '')
       if (M.no != null && /^\d+$/.test(r[M.no] || '')) no = +r[M.no]
       if (M.lv != null && r[M.lv]) level = normLevel(r[M.lv])
+      if (M.sid != null) sid = r[M.sid] || ''
     } else {
       name = r.find((x) => x && !/^\d+$/.test(x))
       const nn = r.find((x) => /^\d+$/.test(x))
       if (nn) no = +nn
     }
     name = (name || '').replace(/\s+/g, ' ').trim()
-    return { name, no, level }
+    return { name, no, level, sid }
   }).filter((x) => x.name)
   const seen = new Set(activeStudents.map((s) => `${s.level}|${s.name}`))
   out.forEach((x) => {

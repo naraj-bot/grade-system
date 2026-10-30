@@ -21,23 +21,24 @@ import { engineStop } from './engine/engine'
 const ALL = ['superadmin', 'schooladmin', 'teacher']
 const ADMIN = ['superadmin', 'schooladmin']
 const E = (page) => () => <EnginePage page={page} />
+const GROUPS = ['ภาพรวม', 'ข้อมูลหลัก', 'การสอน', 'เอกสาร', 'ตั้งค่า']
 const PAGES = [
-  ['/', 'หน้าแรก', 'หน้าแรก', 'home', ALL, Home],
-  ['/years', 'ปีการศึกษา', 'ปีการศึกษา', 'cal', ADMIN, AcademicYears],
-  ['/users', 'ผู้ใช้', 'ผู้ใช้', 'users', ADMIN, Users],
-  ['/catalog', 'รายวิชา', 'รายวิชา', 'book', ALL, Catalog],
-  ['/students', 'นักเรียน', 'นักเรียน', 'users', ADMIN, Students],
-  ['/reg', 'ลงทะเบียนสอน', 'ลงทะเบียน', 'reg', ALL, Registration],
-  ['/scores', 'กรอกคะแนน', 'คะแนน', 'edit', ALL, E('scores')],
-  ['/acts', 'กิจกรรมพัฒนาผู้เรียน', 'กิจกรรม', 'flag', ALL, E('acts')],
-  ['/eval', 'ประเมินผู้เรียน', 'ประเมิน', 'star', ALL, E('eval')],
-  ['/p5', 'สมุด ปพ.5', 'ปพ.5', 'print', ALL, E('p5')],
-  ['/report', 'ใบแจ้งผลการเรียน', 'แจ้งผล', 'book', ALL, E('report')],
-  ['/summary', 'สรุปผลรายห้อง', 'สรุปห้อง', 'book', ALL, E('summary')],
-  ['/backup', 'สำรองข้อมูล', 'สำรอง', 'down', ADMIN, Backup],
-  ['/school', 'ตั้งค่าโรงเรียน', 'โรงเรียน', 'school', ADMIN, E('school')],
-  ['/sign', 'ลายเซ็นของฉัน', 'ลายเซ็น', 'pen', ALL, E('sign')],
-  ['/guide', 'คู่มือการใช้งาน', 'คู่มือ', 'help', ALL, E('guide')],
+  ['/', 'ภาพรวม', 'หน้าแรก', 'home', ALL, Home, 'ภาพรวม'],
+  ['/guide', 'คู่มือเริ่มใช้งาน', 'คู่มือ', 'help', ALL, E('guide'), 'ภาพรวม'],
+  ['/years', 'ปีการศึกษา', 'ปีการศึกษา', 'cal', ADMIN, AcademicYears, 'ข้อมูลหลัก'],
+  ['/users', 'บัญชีครู', 'ผู้ใช้', 'users', ADMIN, Users, 'ข้อมูลหลัก'],
+  ['/students', 'รายชื่อนักเรียน', 'นักเรียน', 'users', ADMIN, Students, 'ข้อมูลหลัก'],
+  ['/catalog', 'รายวิชา', 'รายวิชา', 'book', ALL, Catalog, 'ข้อมูลหลัก'],
+  ['/reg', 'ลงทะเบียนวิชาสอน', 'ลงทะเบียน', 'reg', ALL, Registration, 'การสอน'],
+  ['/scores', 'บันทึกคะแนน', 'คะแนน', 'edit', ALL, E('scores'), 'การสอน'],
+  ['/acts', 'กิจกรรมพัฒนาผู้เรียน', 'กิจกรรม', 'flag', ALL, E('acts'), 'การสอน'],
+  ['/eval', 'ประเมินคุณลักษณะ', 'ประเมิน', 'star', ALL, E('eval'), 'การสอน'],
+  ['/p5', 'สมุด ปพ.5', 'ปพ.5', 'print', ALL, E('p5'), 'เอกสาร'],
+  ['/report', 'ใบแจ้งผลการเรียน', 'แจ้งผล', 'book', ALL, E('report'), 'เอกสาร'],
+  ['/summary', 'สรุปผลรายห้อง', 'สรุปห้อง', 'book', ALL, E('summary'), 'เอกสาร'],
+  ['/school', 'ตั้งค่าโรงเรียน', 'โรงเรียน', 'school', ADMIN, E('school'), 'ตั้งค่า'],
+  ['/backup', 'สำรองข้อมูล', 'สำรอง', 'down', ADMIN, Backup, 'ตั้งค่า'],
+  ['/sign', 'ลายเซ็นของฉัน', 'ลายเซ็น', 'pen', ALL, E('sign'), 'ตั้งค่า'],
 ]
 // เมนูหลักที่แสดงบนแถบล่างของจอเล็ก (ที่เหลือเข้าทางปุ่ม "อื่น ๆ")
 const MAIN = { superadmin: ['/', '/years', '/users', '/reg'], schooladmin: ['/', '/reg', '/students', '/p5'], teacher: ['/reg', '/scores', '/acts', '/p5'] }
@@ -59,16 +60,26 @@ function Shell() {
     <div className="app">
       <aside className="side">
         <div className="brand">
-          <div className="crest"><img src="/logo.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
+          <div className="crest"><img src="/logo.png" alt="" /></div>
           <div><b>ระบบตัดเกรด</b><small>โรงเรียนวัดบางปูน</small></div>
         </div>
+        {openYear && <div className="yc"><span>ปีการศึกษา <b>{openYear.year}</b></span><span className="yt">ภาคเรียนที่ {term}</span></div>}
         <nav className="nav" aria-label="เมนูหลัก">
           <div className="nd">
-            {pages.map(([to, label, , icon]) => (
-              <button key={to} onClick={() => go(to)} aria-current={cur[0] === to ? 'page' : undefined}>
-                <Icon name={icon} /><span>{label}</span>
-              </button>
-            ))}
+            {GROUPS.map((g) => {
+              const items = pages.filter((p) => p[6] === g)
+              if (!items.length) return null
+              return (
+                <div className="ng" key={g}>
+                  <div className="gl">{g}</div>
+                  {items.map(([to, label, , icon]) => (
+                    <button key={to} onClick={() => go(to)} aria-current={cur[0] === to ? 'page' : undefined}>
+                      <Icon name={icon} /><span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            })}
           </div>
           <div className="nm">
             {main.map(([to, , short, icon]) => (
@@ -83,6 +94,11 @@ function Shell() {
             )}
           </div>
         </nav>
+        <div className="uf">
+          <div className="av" aria-hidden="true">{(user.name || '?').replace(/^(นาย|นางสาว|นาง|ครู)/, '').trim().charAt(0)}</div>
+          <div className="un"><b>{user.name}</b><small>{ROLE_LABEL[user.role]}</small></div>
+          <button className="lo" onClick={logout} aria-label="ออกจากระบบ" title="ออกจากระบบ"><Icon name="out" size={18} /></button>
+        </div>
         {more && (
           <div className="more">
             {rest.map(([to, label, , icon]) => (
@@ -100,8 +116,8 @@ function Shell() {
               <button key={t} className="chip" aria-pressed={term === t} onClick={() => setTerm(t)}>ภาคเรียนที่ {t}</button>
             ))}
             <Bell />
-            <span className="small muted">{user.name} ({ROLE_LABEL[user.role]})</span>
-            <button className="btn alt sm" onClick={logout}>ออกจากระบบ</button>
+            <span className="topuser small">{user.name} ({ROLE_LABEL[user.role]})</span>
+            <button className="btn alt sm topuser" onClick={logout}>ออกจากระบบ</button>
           </div>
         </div>
         <Routes>

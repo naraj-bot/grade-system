@@ -26,10 +26,11 @@ export default function EnginePage({ page }) {
   const go = useMemo(() => (pg) => nav(pg === 'home' ? '/' : '/' + pg), [nav])
 
   useEffect(() => {
-    if (!openYear) return
-    engineUpdate({ user, year: openYear.year, term, setTerm, go, students, catalog, openSet, regs, teachers }, page)
+    // ยังไม่มีปีการศึกษาที่เปิด → โหมดแบบฟอร์ม: ดู/โหลดฟอร์มเปล่าได้ กรอกไม่ได้
+    engineUpdate(openYear
+      ? { user, year: openYear.year, term, setTerm, go, students, catalog, openSet, regs, teachers }
+      : { user, year: 0, template: true, term, setTerm, go, students: [], catalog, openSet: new Set(), regs: [], teachers }, page)
   }, [user, openYear?.year, term, students, catalog, openSet, regs, teachers, page, go, setTerm])
 
-  if (!openYear) return <div className="card empty">ยังไม่มีปีการศึกษาที่เปิดใช้งาน</div>
   return <div id="view" />
 }
