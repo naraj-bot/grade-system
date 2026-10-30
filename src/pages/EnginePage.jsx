@@ -19,8 +19,8 @@ export default function EnginePage({ page }) {
 
   useEffect(() => {
     if (!isAdminRole(user.role)) return
-    return onSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')),
-      (s) => setTeachers(s.docs.filter((d) => d.data().active !== false).map((d) => ({ uid: d.id, name: d.data().name })).sort((a, b) => a.name.localeCompare(b.name, 'th'))))
+    return onSnapshot(query(collection(db, 'users'), where('role', 'in', ['teacher', 'schooladmin', 'superadmin'])),
+      (s) => setTeachers(s.docs.filter((d) => d.data().active !== false).map((d) => ({ uid: d.id, name: d.data().name, username: d.data().username, role: d.data().role })).sort((a, b) => a.name.localeCompare(b.name, 'th'))))
   }, [user.role])
 
   const go = useMemo(() => (pg) => nav(pg === 'home' ? '/' : '/' + pg), [nav])

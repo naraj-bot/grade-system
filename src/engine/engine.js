@@ -465,8 +465,10 @@ function clubsHtml() {
 }
 function homeroomCard() {
   if (!isAdmin()) return ''
-  return `<div class="card stack"><h3>ครูที่ปรึกษาประจำชั้น</h3><div class="small muted">ครูที่ปรึกษากรอกกิจกรรมพัฒนาผู้เรียนของห้อง และลงนามในใบแจ้งผล (ชื่อแรกเป็นผู้ลงนาม) ชั้นละไม่เกิน 2 คน</div>
-  ${LEVELS.map((l) => `<div class="row"><b style="min-width:40px">${l}</b>${TEACHERS.map((t) => `<button class="chip" aria-pressed="${(HOMEROOM[l] || []).includes(t.uid)}" data-hr="${l}" data-uid="${t.uid}">${esc(t.name)}</button>`).join('') || '<span class="small muted">ยังไม่มีบัญชีครู</span>'}</div>`).join('')}</div>`
+  const label = (t) => esc(t.name) + (TEACHERS.filter((x) => x.name === t.name).length > 1 ? ` (${esc(t.username || '')})` : '') + (t.role === 'teacher' ? '' : t.role === 'superadmin' ? ' · แอดมินหลัก' : ' · แอดมิน')
+  const sel = (L, i) => { const cur = (HOMEROOM[L] || [])[i] || ''; return `<select data-hrsel="${L}" data-slot="${i}" aria-label="ครูที่ปรึกษา ${L} คนที่ ${i + 1}"><option value="">${i ? '— ไม่มี —' : '— ยังไม่กำหนด —'}</option>${TEACHERS.map((t) => `<option value="${t.uid}" ${cur === t.uid ? 'selected' : ''}>${label(t)}</option>`).join('')}</select>` }
+  return `<div class="card stack"><h3>ครูที่ปรึกษาประจำชั้น</h3><div class="small muted">เลือกจากรายชื่อ ครูผู้สอนและแอดมินที่สอนด้วยเป็นที่ปรึกษาได้ ชั้นละไม่เกิน 2 คน คนที่ 1 เป็นผู้ลงนามในใบแจ้งผล ครูที่ปรึกษากรอกกิจกรรมพัฒนาผู้เรียนของห้องได้</div>
+  ${TEACHERS.length ? `<div class="hrgrid">${LEVELS.map((l) => `<div class="hrc"><b>${l}</b><label>คนที่ 1 (ผู้ลงนาม)${sel(l, 0)}</label><label>คนที่ 2${sel(l, 1)}</label></div>`).join('')}</div>` : '<span class="small muted">ยังไม่มีบัญชีครู</span>'}</div>`
 }
 
 
@@ -627,7 +629,8 @@ reg('click', (e) => {
 reg('change', (e) => {
   const t = e.target
   if (!$('#view') || !$('#view').contains(t)) return
-  if (t.id === 'allsubj') { S.allSubj = t.checked; render() }
+  if (t.dataset.hrsel) { const L = t.dataset.hrsel, v = [...new Set([...document.querySelectorAll(`select[data-hrsel="${L}"]`)].map((x) => x.value).filter(Boolean))]; HOMEROOM[L] = v; render() }
+  else if (t.id === 'allsubj') { S.allSubj = t.checked; render() }
   else if (t.id === 'sub') { S.scCode = t.value; render() }
   else if (t.id === 'rt') { cfgOf(S.scCode).ratio = t.value; render() }
   else if (t.id === 'gd') { S.guidance = t.value; render() }
