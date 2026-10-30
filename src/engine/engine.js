@@ -6,6 +6,7 @@ import { auth, db } from '../firebase'
 import { printCss } from './printcss'
 import { buildXlsx } from '../lib/xlsx'
 import { htmlToDocx } from '../lib/docx'
+import { ask } from '../lib/dialog'
 
 const $ = (s) => document.querySelector(s)
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -613,7 +614,7 @@ reg('click', (e) => {
   if (d.mem) { const m = S.members[d.club]; m.ids = m.ids || []; const k = m.ids.indexOf(d.mem); k < 0 ? m.ids.push(d.mem) : (m.ids.splice(k, 1), m.v && delete m.v[d.mem]); render(); return }
   const a = d.act
   if (a === 'newclub') { const n = ($('#clubn').value || '').trim(); if (!n) return toast('พิมพ์ชื่อชุมนุม'); if (S.members[n]) return toast('มีชุมนุมชื่อนี้แล้ว'); S.members[n] = { owner: S.role, ids: [], v: {} }; render() }
-  else if (a === 'delclub') { const m = S.members[d.club]; if (m && confirm('ลบชุมนุม ' + d.club + ' ?')) { delete S.members[d.club]; render() } }
+  else if (a === 'delclub') { const m = S.members[d.club]; if (m) ask({ title: 'ลบชุมนุม "' + d.club + '" ?', text: 'รายชื่อนักเรียนและผลของชุมนุมนี้จะถูกลบ', ok: 'ลบชุมนุม', danger: true }).then((y) => { if (y) { delete S.members[d.club]; render(); persist() } }) }
   else if (a === 'clubpass') { const m = S.members[d.club]; m.v = m.v || {}; (m.ids || []).forEach((id) => (m.v[id] = 'ผ')); render() }
   else if (a === 'allpass') { const st = S.acts[d.key]; if (!claim(d.key)) return; ACT().filter((s) => s.level === d.key.split('|')[0]).forEach((s) => (st.v[s.id] = 'ผ')); render() }
   else if (a === 'release') { S.acts[d.key].owner = null; render() }

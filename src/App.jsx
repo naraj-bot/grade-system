@@ -124,7 +124,12 @@ function Shell() {
           {pages.map(([to, , , , , Page]) => <Route key={to} path={to} element={<Page />} />)}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
-        <footer className="credit">พัฒนาโดย ครูซอสสอนสังคม</footer>
+        <div className="credit-gap" />
+        <footer className="credit">
+          <img src="/logo.png" alt="" />
+          <div className="ct"><b>ระบบตัดเกรด · โรงเรียนวัดบางปูน</b><span>สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสิงห์บุรี</span></div>
+          <div className="cd">พัฒนาโดย <b>ครูซอสสอนสังคม</b></div>
+        </footer>
       </div>
     </div>
   )

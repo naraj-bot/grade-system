@@ -6,6 +6,7 @@ import { useData } from '../data'
 import Catalog from './Catalog'
 import { useRegs } from '../lib/useRegs'
 import { notify } from '../lib/notify'
+import { tell } from '../lib/dialog'
 import { LEVELS, REG_STATUS, isAdminRole } from '../lib/constants'
 
 const pillOf = (s) => (s === 'ok' ? 'p-good' : s === 'pending' ? 'p-warn' : 'p-bad')
@@ -28,7 +29,7 @@ function AdminView({ regs }) {
   const [msgs, setMsgs] = useState({})
   const list = regs.filter((r) => r.term === term).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   const act = async (r, status) => {
-    if (status === 'back' && !(msgs[r.id] || '').trim()) return alert('พิมพ์ข้อความถึงครูก่อนส่งกลับ')
+    if (status === 'back' && !(msgs[r.id] || '').trim()) return tell({ title: 'ยังไม่ได้พิมพ์ข้อความ', text: 'พิมพ์ข้อความถึงครูก่อนส่งกลับ เพื่อให้ครูรู้ว่าต้องแก้อะไร', tone: 'warn' })
     const msg = status === 'back' ? msgs[r.id].trim() : ''
     await updateDoc(doc(db, 'registrations', r.id), { status, msg, updatedAt: Date.now() })
     notify(r.uid, status === 'ok' ? `แอดมินอนุมัติการลงทะเบียนสอนของคุณแล้ว (ภาคเรียนที่ ${r.term})` : `แอดมินส่งการลงทะเบียนกลับ: ${msg}`, 'reg', user.uid)
@@ -76,7 +77,7 @@ function TeacherView({ regs }) {
   const locked = !admin && mine?.status === 'ok'
 
   const submit = async () => {
-    if (!picked.size) return alert('เลือกวิชาที่สอนอย่างน้อย 1 วิชา')
+    if (!picked.size) return tell({ title: 'ยังไม่ได้เลือกวิชา', text: 'เลือกวิชาที่สอนอย่างน้อย 1 วิชา', tone: 'warn' })
     setBusy(true)
     try {
       await setDoc(doc(db, 'registrations', `${openYear.year}_${term}_${user.uid}`), {

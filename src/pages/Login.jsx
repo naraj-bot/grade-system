@@ -29,8 +29,8 @@ export default function Login({ onClose }) {
     try {
       await login(username, password)
       try { remember ? localStorage.setItem('lastUser', username.trim()) : localStorage.removeItem('lastUser') } catch { /* ไม่เป็นไร */ }
-    } catch {
-      setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
+    } catch (e) {
+      setError(e && e.code === 'auth/user-disabled' ? 'บัญชีนี้ถูกปิดใช้งาน ติดต่อผู้ดูแลระบบของโรงเรียน' : 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
     } finally {
       setBusy(false)
     }

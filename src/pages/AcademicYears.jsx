@@ -3,6 +3,7 @@ import { collection, doc, onSnapshot, orderBy, query, setDoc, updateDoc, writeBa
 import { db } from '../firebase'
 import { useAuth } from '../auth'
 import { useData } from '../data'
+import { ask } from '../lib/dialog'
 
 // ปีการศึกษา: years/{ปี พ.ศ.} { year, status: 'open' | 'closed' }
 // ภาคเรียน:   years/{ปี}/terms/{1|2} { term, status }
@@ -34,15 +35,17 @@ export default function AcademicYears() {
   }
 
   const closeYear = async (y) => {
-    if (!confirm(`ปิดปีการศึกษา ${y} ? ปิดแล้วข้อมูลจะดูและส่งออกได้อย่างเดียว`)) return
+    if (!(await ask({ title: `ปิดปีการศึกษา ${y} ?`, text: 'ปิดแล้วข้อมูลจะดูและส่งออกได้อย่างเดียว และต้องเปิดปีใหม่เพื่อใช้งานต่อ', ok: 'ปิดปีการศึกษา', danger: true }))) return
     await updateDoc(doc(db, 'years', String(y)), { status: 'closed' })
   }
 
   const t2open = terms.some((t) => t.term === 2 && t.status === 'open')
   const toggleTerm2 = async (y) => {
     const next = t2open ? 'pending' : 'open'
-    const q = t2open ? `ย้อนภาคเรียนที่ 2 กลับเป็น "ยังไม่เปิด" ? (ข้อมูลที่กรอกไว้ไม่หาย)` : `เปิดภาคเรียนที่ 2 ของปีการศึกษา ${y} ? ควรเปิดเมื่อจบภาคเรียนที่ 1 แล้ว`
-    if (!confirm(q)) return
+    const go = await ask(t2open
+      ? { title: 'ย้อนภาคเรียนที่ 2 กลับเป็น "ยังไม่เปิด" ?', text: 'ข้อมูลที่กรอกไว้ไม่หาย', ok: 'ย้อนกลับ' }
+      : { title: `เปิดภาคเรียนที่ 2 ของปีการศึกษา ${y} ?`, text: 'ควรเปิดเมื่อจบภาคเรียนที่ 1 แล้ว', ok: 'เปิดภาคเรียนที่ 2' })
+    if (!go) return
     await setDoc(doc(db, 'years', String(y), 'terms', '2'), { term: 2, status: next }, { merge: true })
   }
 
