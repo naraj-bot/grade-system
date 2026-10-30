@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { useAuth } from '../auth'
@@ -8,6 +8,15 @@ import { useRegs } from '../lib/useRegs'
 import { notify } from '../lib/notify'
 import { tell } from '../lib/dialog'
 import { LEVELS, REG_STATUS, isAdminRole } from '../lib/constants'
+
+const Row = memo(function Row({ c, on, onToggle }) {
+  return (
+    <tr>
+      <td><input type="checkbox" checked={on} aria-label={`เลือก ${c.name}`} onChange={() => onToggle(c.code)} /></td>
+      <td>{c.level}</td><td>{c.code}</td><td>{c.name}</td>
+    </tr>
+  )
+})
 
 const pillOf = (s) => (s === 'ok' ? 'p-good' : s === 'pending' ? 'p-warn' : 'p-bad')
 
@@ -53,7 +62,7 @@ function AdminView({ regs }) {
           )}
         </div>
       ))}
-      {!list.length && <div className="card empty">ยังไม่มีการลงทะเบียนในภาคเรียนนี้</div>}
+      {!list.length && <div className="card empty">ยังไม่มีครูท่านอื่นส่งลงทะเบียนในภาคเรียนนี้ (วิชาของคุณเองอยู่ในกล่อง "วิชาที่ฉันสอน" ด้านบน)</div>}
     </div>
   )
 }
@@ -72,19 +81,38 @@ function TeacherView({ regs }) {
     setPicked(new Set(mine.codes))
     setLevels(new Set(mine.codes.map((c) => catalog.find((x) => x.code === c)?.level).filter(Boolean)))
   }, [mine?.updatedAt, mine?.status])
-  const toggle = (set, setter, v) => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); setter(n) }
-  const subj = termCatalog.filter((c) => levels.has(c.level) && openSet.has(c.code))
+  // เปลี่ยนภาคเรียน/ปี: เริ่มใหม่จากใบลงทะเบียนของภาคนั้น (ไม่ค้างของภาคก่อน)
+  useEffect(() => {
+    setPicked(new Set(mine ? mine.codes : []))
+    setLevels(new Set(mine ? mine.codes.map((c) => catalog.find((x) => x.code === c)?.level).filter(Boolean) : []))
+  }, [term, openYear?.year])
+  const subj = useMemo(() => termCatalog.filter((c) => levels.has(c.level) && openSet.has(c.code)), [termCatalog, levels, openSet])
+  // เปลี่ยนชั้น: ชั้นที่เอาออก → ล้างวิชาที่เคยติ๊กไว้ของชั้นนั้นด้วย
+  const toggleLevel = (l) => {
+    const n = new Set(levels)
+    if (n.has(l)) {
+      n.delete(l)
+      setPicked((p) => new Set([...p].filter((code) => catalog.find((x) => x.code === code)?.level !== l)))
+    } else n.add(l)
+    setLevels(n)
+  }
+  const togglePick = useCallback((code) => setPicked((p) => { const n = new Set(p); n.has(code) ? n.delete(code) : n.add(code); return n }), [])
+  const clearAll = () => { setLevels(new Set()); setPicked(new Set()) }
   const locked = !admin && mine?.status === 'ok'
 
   const submit = async () => {
-    if (!picked.size) return tell({ title: 'ยังไม่ได้เลือกวิชา', text: 'เลือกวิชาที่สอนอย่างน้อย 1 วิชา', tone: 'warn' })
+    const codes = [...picked].filter((code) => levels.has(catalog.find((x) => x.code === code)?.level))
+    if (!codes.length) return tell({ title: 'ยังไม่ได้เลือกวิชา', text: 'เลือกวิชาที่สอนอย่างน้อย 1 วิชา', tone: 'warn' })
     setBusy(true)
     try {
       await setDoc(doc(db, 'registrations', `${openYear.year}_${term}_${user.uid}`), {
         year: openYear.year, term, uid: user.uid, name: user.name,
-        codes: [...picked], status: admin ? 'ok' : 'pending', msg: '', updatedAt: Date.now(),
+        codes, status: admin ? 'ok' : 'pending', msg: '', updatedAt: Date.now(),
       })
-      if (!admin) notify('admins', `${user.name} ส่งลงทะเบียนสอน ${picked.size} วิชา (ภาคเรียนที่ ${term}) รออนุมัติ`, 'reg', user.uid)
+      if (!admin) notify('admins', `${user.name} ส่งลงทะเบียนสอน ${codes.length} วิชา (ภาคเรียนที่ ${term}) รออนุมัติ`, 'reg', user.uid)
+      tell({ title: 'บันทึกแล้ว', text: admin ? `บันทึกวิชาที่สอน ${codes.length} วิชา (ภาคเรียนที่ ${term}) แล้ว` : `ส่งให้แอดมินอนุมัติแล้ว (${codes.length} วิชา)`, tone: 'ok' })
+    } catch (e) {
+      tell({ title: 'บันทึกไม่สำเร็จ', text: 'ลองใหม่อีกครั้ง หากยังไม่ได้ให้ตรวจ Firestore rules (' + (e.code || e.message) + ')', tone: 'warn' })
     } finally { setBusy(false) }
   }
 
@@ -105,19 +133,15 @@ function TeacherView({ regs }) {
         <div className="card stack">
           <h3>1. เลือกชั้นที่สอน (เลือกได้หลายชั้น)</h3>
           <div className="row">
-            {LEVELS.map((l) => <button key={l} className="chip" aria-pressed={levels.has(l)} onClick={() => toggle(levels, setLevels, l)}>{l}</button>)}
+            {LEVELS.map((l) => <button key={l} className="chip" aria-pressed={levels.has(l)} onClick={() => toggleLevel(l)}>{l}</button>)}
+            {(levels.size > 0 || picked.size > 0) && <button className="btn sm alt" onClick={clearAll}>ล้างที่เลือกทั้งหมด</button>}
           </div>
           <h3>2. เลือกวิชา</h3>
-          <div className="tw">
+          <div className="tw regtw">
             <table>
               <thead><tr><th></th><th>ชั้น</th><th>รหัส</th><th>รายวิชา</th></tr></thead>
               <tbody>
-                {subj.map((c) => (
-                  <tr key={c.code}>
-                    <td><input type="checkbox" checked={picked.has(c.code)} aria-label={`เลือก ${c.name}`} onChange={() => toggle(picked, setPicked, c.code)} /></td>
-                    <td>{c.level}</td><td>{c.code}</td><td>{c.name}</td>
-                  </tr>
-                ))}
+                {subj.map((c) => <Row key={c.code} c={c} on={picked.has(c.code)} onToggle={togglePick} />)}
                 {!subj.length && <tr><td colSpan={4} className="empty">เลือกชั้นก่อน (แสดงเฉพาะวิชาที่แอดมินเปิดสอนแล้ว)</td></tr>}
               </tbody>
             </table>
