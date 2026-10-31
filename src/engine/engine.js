@@ -757,6 +757,29 @@ reg('change', (e) => {
   else if (t.dataset.av) { const st = S.acts[t.dataset.av]; if (!claim(t.dataset.av)) { render(); return } st.v[t.dataset.s] = t.value }
   else if (t.dataset.cv) { const m = S.members[t.dataset.club]; m.v = m.v || {}; m.v[t.dataset.cv] = t.value }
 })
+// ลูกศร/Enter เลื่อนช่องกรอกคะแนน (ซ้าย-ขวา-ขึ้น-ลง)
+reg('keydown', (e) => {
+  const t = e.target
+  if (!t || !t.matches || !t.matches('input[data-sc],input[data-ab]') || !$('#view') || !$('#view').contains(t)) return
+  const k = e.key
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(k)) return
+  const td = t.closest('td'), tr = td && td.closest('tr'); if (!tr) return
+  const ok = (x) => x && !x.disabled
+  const cellIn = (row, ci) => { const c = row && row.cells[ci]; const i = c && c.querySelector('input[data-sc],input[data-ab]'); return ok(i) ? i : null }
+  let target = null
+  if (k === 'ArrowLeft' || k === 'ArrowRight') {
+    const d = k === 'ArrowLeft' ? -1 : 1
+    for (let ci = td.cellIndex + d; ci >= 0 && ci < tr.cells.length; ci += d) { const i = cellIn(tr, ci); if (i) { target = i; break } }
+  } else {
+    const d = k === 'ArrowUp' ? -1 : 1
+    for (let r = tr.sectionRowIndex + d, rows = tr.parentNode.rows; r >= 0 && r < rows.length; r += d) { const i = cellIn(rows[r], td.cellIndex); if (i) { target = i; break } }
+  }
+  e.preventDefault()
+  if (!target) return
+  const sel = target.dataset.sc ? `input[data-sc="${target.dataset.sc}"][data-i="${target.dataset.i}"]` : `input[data-ab="${target.dataset.ab}"]`
+  target.focus() // blur ของช่องเดิมจะบันทึกค่าและ render ใหม่
+  const f = $('#view').querySelector(sel); if (f) { f.focus(); try { f.select() } catch (_) {} }
+})
 function claim(key) {
   const st = S.acts[key]; if (isAdmin()) return true
   if (st.owner && st.owner !== S.role) { toast('ครูอีกคนกรอกกิจกรรมนี้แล้ว'); return false }
