@@ -360,9 +360,12 @@ const GUIDE={
  super:[['ตั้งปีการศึกษา','เปิดปีการศึกษาและภาคเรียน ปิดปีเมื่อสิ้นปีเพื่อเก็บข้อมูลและเลื่อนชั้น','years'],['สร้างบัญชีผู้ใช้','สร้างแอดมินโรงเรียนและครู กำหนดรหัสเริ่มต้น รีเซ็ตรหัสเมื่อลืม และส่งออกใบรหัส','users'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่จะเปิดสอนในปีและภาคเรียนนี้','catalog'],['เพิ่มนักเรียน','เพิ่มทีละคนหรือวางรายชื่อหลายคน ระบบเลื่อนชั้นให้เองตอนขึ้นปีใหม่','students'],['อนุมัติการสอน','ตรวจที่ครูลงทะเบียน อนุมัติ หรือส่งกลับพร้อมข้อความ','reg'],['ติดตามและส่งออก','ดูเอกสารของแต่ละวิชาและดาวน์โหลดเป็นหลักฐาน','p5']],
  admin:[['ตั้งค่าโรงเรียน','กรอกชื่อและลายเซ็นของ ผอ. หัวหน้างานวัดผล หัวหน้างานวิชาการ และหัวหน้ากลุ่มสาระ ให้ขึ้นในเล่ม ปพ.5','school'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่เปิดสอนในภาคเรียนนี้ ทีละวิชาหรือหลายวิชา','catalog'],['จัดการนักเรียน','เพิ่มนักเรียนใหม่ ย้ายเข้า หรือวางรายชื่อหลายคน','students'],['อนุมัติการสอน','ตรวจรายการที่ครูลงทะเบียน ถ้าไม่ถูกต้องส่งกลับพร้อมข้อความ','reg'],['ดูคะแนนและกิจกรรม','ติดตามว่าครูกรอกครบหรือยัง ปล่อยสิทธิ์กิจกรรมเมื่อครูกรอกค้าง','acts'],['ลงนามและอนุมัติเล่ม','ในหน้าสมุด ปพ.5 ติ๊กลงนามของหัวหน้าฝ่ายต่าง ๆ และให้ ผอ. อนุมัติ พร้อมวันที่','p5'],['ดาวน์โหลดเอกสาร','ดาวน์โหลด ปพ.5 ของแต่ละวิชาและเอกสารสรุป','p5']],
  teacher:[['ลงทะเบียนวิชาที่สอน','เลือกชั้นที่สอนได้หลายชั้น แล้วติ๊กวิชาที่ตัวเองสอน ส่งให้แอดมินอนุมัติทุกปีการศึกษาและภาคเรียน','reg'],['รอการอนุมัติ','ถ้าแอดมินส่งกลับจะมีแจ้งเตือนและข้อความ ให้แก้แล้วส่งใหม่','reg'],['ตั้งช่องคะแนนเก็บ','ตั้งว่าเก็บกี่ช่อง ช่องละเท่าไร ประถมเลือกเก็บ 100 หรือ 50 ต่อภาคเรียน','scores'],['กรอกคะแนน','กรอกคะแนนแต่ละช่อง ปลายภาค และชั่วโมงที่ขาดเฉพาะคนที่ขาด (ไม่กรอก = มาครบ) ระบบรวมและตัดเกรดให้ ผู้ที่เวลาเรียนต่ำกว่า 80% จะได้ มส.','scores'],['ตัดสินกิจกรรม','ชุมนุมเลือกสมาชิกของตน ส่วนลูกเสือและกิจกรรมเพื่อสังคมเป็นของครูที่ปรึกษา','acts'],['ประเมินผู้เรียน','ให้คะแนนคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะ รายข้อ ทีละคนหรือทั้งห้อง ระบบสรุปผลให้ (ประถมกรอกภาคเรียนที่ 2)','eval'],['ออกใบแจ้งผลการเรียน (ประถม ภาคเรียนที่ 1)','เลือกชั้น ดูตัวอย่างรายบุคคล ดาวน์โหลด PDF รายบุคคลหรือทั้งห้อง พร้อมลงนามครูที่ปรึกษา','report'],['สร้างลายเซ็น','วาดลายเซ็นด้วยนิ้วหรือเมาส์ หรือแนบภาพ ใช้ลงชื่อในเล่ม ปพ.5','sign'],['กรอกข้อมูลประกอบเล่ม','คำอธิบายรายวิชา (ข้อความหรือภาพ) มาตรฐาน/ตัวชี้วัดและเวลาของแต่ละหน่วย แล้วดูรายการตรวจความครบถ้วน','p5'],['ลงนามและดาวน์โหลด ปพ.5','กดลงลายมือชื่อครูผู้สอน ตรวจครบแล้วดาวน์โหลดเป็นหลักฐาน ระบบตั้งชื่อไฟล์ให้','p5']]};
-P.guide=()=>{const k=me().kind,st=GUIDE[k];
- return `<div class="stack"><div class="card"><b>คู่มือสำหรับ${{super:'แอดมินหลัก',admin:'แอดมินโรงเรียน',teacher:'ครูผู้สอน'}[k]}</b><div class="small muted">ทำตามลำดับ กดปุ่มเพื่อไปยังหน้านั้น</div></div>
- ${st.map((x,i)=>`<div class="card step"><i>${i+1}</i><div class="stack" style="gap:6px"><b>${x[0]}</b><span class="small muted">${x[1]}</span><div><button class="btn sm alt" data-go="${x[2]}">ไปที่หน้านี้</button></div></div></div>`).join('')}
+P.guide=()=>{const k=me().kind,NM={super:'แอดมินหลัก',admin:'แอดมินโรงเรียน',teacher:'ครูผู้สอน'}
+ const tabs=k==='super'?['super','admin','teacher']:k==='admin'?['admin','teacher']:['teacher']
+ const v=tabs.includes(S.guideKind)?S.guideKind:k, own=v===k, st=GUIDE[v]
+ return `<div class="stack"><div class="card"><b>คู่มือสำหรับ${NM[v]}</b><div class="small muted">${own?'ทำตามลำดับ กดปุ่มเพื่อไปยังหน้านั้น':'ดูเพื่อทำความเข้าใจขั้นตอนของบทบาทนี้ (ปุ่มไปหน้าต่าง ๆ ใช้ได้เฉพาะคู่มือของบทบาทคุณ)'}</div>
+ ${tabs.length>1?`<div class="row" style="margin-top:8px">${tabs.map(x=>`<button class="btn sm ${x===v?'':'alt'}" data-gk="${x}">${x===k?'คู่มือของฉัน · ':''}${NM[x]}</button>`).join('')}</div>`:''}</div>
+ ${st.map((x,i)=>`<div class="card step"><i>${i+1}</i><div class="stack" style="gap:6px"><b>${x[0]}</b><span class="small muted">${x[1]}</span>${own?`<div><button class="btn sm alt" data-go="${x[2]}">ไปที่หน้านี้</button></div>`:''}</div></div>`).join('')}
  <div class="card"><b>ข้อควรรู้</b><ul class="small" style="margin:6px 0 0;padding-left:18px">
   <li>ประถม ภาคเรียนที่ 1 ยังไม่ตัดเกรด ตัดเกรดเมื่อจบภาคเรียนที่ 2 มัธยมตัดเกรดทุกภาคเรียน</li>
   <li>กิจกรรมแนะแนว: มีครูแนะแนวให้ครูแนะแนวตัด ถ้าไม่มีให้ครูที่ปรึกษาตัด</li>
@@ -668,9 +671,10 @@ function downloadReport(which) {
 
 /* ---------- ตัวจัดการเหตุการณ์หลัก ---------- */
 reg('click', (e) => {
-  const t = e.target.closest('[data-go],[data-term],[data-actlv],[data-mem],[data-act],[data-hr],[data-clublv],[data-sumlv]')
+  const t = e.target.closest('[data-gk],[data-go],[data-term],[data-actlv],[data-mem],[data-act],[data-hr],[data-clublv],[data-sumlv]')
   if (!t || !$('#view') || !$('#view').contains(t)) return
   const d = t.dataset
+  if (d.gk) { S.guideKind = d.gk; render(); return }
   if (d.go) { const [pg, cd] = d.go.split('@'); if (cd) S.scCode = cd; CTX.go(pg); return }
   if (d.term) { CTX.setTerm(+d.term); return }
   if (d.sumlv) { S.sumLv = d.sumlv; render(); return }
@@ -815,7 +819,7 @@ const tplGate = (e) => {
   const t = e.target
   if (e.type === 'click') {
     const b = t.closest('button,[data-act],[data-rl],[data-go],[data-term]'); if (!b) return
-    if (b.matches('[data-go],[data-term],[data-sumlv],[data-actlv],[data-clublv],[data-rl],[data-evk],[data-act=dl],[data-act=rdl],[data-act=sumdl]')) return
+    if (b.matches('[data-gk],[data-go],[data-term],[data-sumlv],[data-actlv],[data-clublv],[data-rl],[data-evk],[data-act=dl],[data-act=rdl],[data-act=sumdl]')) return
     e.stopImmediatePropagation(); e.preventDefault(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้')
   } else if (!t.matches('#sub,#rpst,#allsubj')) { e.stopImmediatePropagation(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้') }
 }
