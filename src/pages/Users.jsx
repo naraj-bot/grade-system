@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import { useAuth } from '../auth'
 import { ROLE_LABEL } from '../lib/constants'
 import { ask, tell } from '../lib/dialog'
 import { copyText, credText, saveCredImage } from '../lib/credCard'
+import { saveCredSheet } from '../lib/credSheet'
 
 async function callApi(body) {
   const token = await auth.currentUser.getIdToken()
@@ -102,6 +103,7 @@ export default function Users() {
   const [busy, setBusy] = useState(false)
   const [cred, setCred] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [sel, setSel] = useState(() => new Set())
 
   useEffect(() => {
     const q = isSuper
@@ -173,6 +175,46 @@ export default function Users() {
     if (await ask({ title: `รีเซ็ตรหัสผ่านของ ${u.name} ?`, text: 'ระบบจะสุ่มรหัสใหม่ให้ และให้ตั้งรหัสใหม่เมื่อเข้าครั้งแรก รหัสเดิมใช้ไม่ได้ทันที', ok: 'รีเซ็ตรหัสผ่าน' })) reset(u)
   }
 
+  // ตารางบัญชีเป็นภาพ A4: รหัสผ่านแสดงเฉพาะบัญชีที่สร้าง/รีเซ็ตในหน้านี้ (ระบบไม่เก็บรหัสเดิมไว้ดู)
+  const known = useMemo(() => Object.fromEntries(slips.map((c) => [c.username, c.pw])), [slips])
+  const sortedList = useMemo(() => [...list].sort((x, y) => String(x.username).localeCompare(String(y.username), 'en', { numeric: true })), [list])
+  const sheetRows = (src, pwMap) => src.filter((u) => u.role !== 'superadmin').map((u) => ({
+    username: u.username, name: u.name, role: ROLE_LABEL[u.role] || u.role, pw: pwMap[u.username] || '',
+    note: u.mustChangePassword ? 'ยังไม่เคยเข้าสู่ระบบ' : 'ตั้งรหัสผ่านเองแล้ว',
+  }))
+  const exportSheet = async () => {
+    const rows = sheetRows(sortedList, known)
+    if (!rows.length) return tell({ title: 'ยังไม่มีบัญชี', text: 'ยังไม่มีบัญชีให้ออกรายชื่อ', tone: 'warn' })
+    setBusy(true)
+    try { const n = await saveCredSheet(rows); setMsg(`ดาวน์โหลดภาพ A4 แล้ว ${n} หน้า (${rows.length} บัญชี)`) }
+    catch (err) { tell({ title: 'สร้างภาพไม่สำเร็จ', text: err.message, tone: 'warn' }) }
+    setBusy(false)
+  }
+  const selectable = sortedList.filter((u) => u.role !== 'superadmin')
+  const allSel = selectable.length > 0 && selectable.every((u) => sel.has(u.uid))
+  const toggleSel = (uid) => setSel((s0) => { const n = new Set(s0); n.has(uid) ? n.delete(uid) : n.add(uid); return n })
+  const bulkReset = async () => {
+    const targets = selectable.filter((u) => sel.has(u.uid))
+    if (!targets.length) return
+    if (!(await ask({ title: `รีเซ็ตรหัสผ่าน ${targets.length} บัญชี ?`, text: 'รหัสเดิมของทุกคนที่เลือกจะใช้ไม่ได้ทันที ระบบสุ่มรหัสใหม่ให้และให้ตั้งรหัสใหม่เมื่อเข้าครั้งแรก เสร็จแล้วจะดาวน์โหลดภาพ A4 ที่มีรหัสใหม่ให้ทันที ควรทำก่อนแจกใบรหัสเท่านั้น', ok: 'รีเซ็ตและออกภาพ A4', danger: true }))) return
+    setBusy(true); setMsg('')
+    const ok = [], bad = []
+    for (const u of targets) {
+      const tempPassword = genPassword()
+      try { await callApi({ action: 'reset', uid: u.uid, tempPassword }); ok.push({ name: u.name, username: u.username, pw: tempPassword }) }
+      catch (err) { bad.push(`${u.username} (${err.message})`) }
+    }
+    setSlips((x) => [...x, ...ok]); setSel(new Set())
+    if (ok.length) {
+      try {
+        const m = Object.fromEntries(ok.map((c) => [c.username, c.pw]))
+        const n = await saveCredSheet(sheetRows(targets.filter((u) => m[u.username]), m).map((r) => ({ ...r, note: '' })))
+        setMsg(`รีเซ็ตแล้ว ${ok.length} บัญชี และดาวน์โหลดภาพ A4 ${n} หน้า${bad.length ? ` · ไม่สำเร็จ ${bad.length}: ${bad.join(', ')}` : ''}`)
+      } catch (err) { tell({ title: 'รีเซ็ตแล้วแต่สร้างภาพไม่สำเร็จ', text: err.message + ' · กดพิมพ์ใบรหัสผ่านเริ่มต้นด้านบนแทนได้', tone: 'warn' }) }
+    } else setMsg(`ไม่สำเร็จ ${bad.length}: ${bad.join(', ')}`)
+    setBusy(false)
+  }
+
   return (
     <div className="stack">
       {cred && <CredModal list={cred.list} title={cred.title} onClose={() => setCred(null)} />}
@@ -210,11 +252,21 @@ export default function Users() {
           <span className="small muted">รหัสแสดงได้เฉพาะตอนสร้าง/รีเซ็ตเท่านั้น พิมพ์เก็บไว้แจกครู</span>
         </div>
       )}
+      {isSuper && (
+        <div className="card stack">
+          <div className="row">
+            <button className="btn sm" disabled={busy} onClick={exportSheet}>ดาวน์โหลดรายชื่อบัญชี (ภาพ A4)</button>
+            <button className="btn sm alt" disabled={busy || !sel.size} onClick={bulkReset}>รีเซ็ตรหัสที่เลือก ({sel.size}) แล้วออกภาพ A4</button>
+          </div>
+          <div className="small muted">ระบบไม่เก็บรหัสเดิมไว้ดู ภาพจะมีรหัสผ่านเฉพาะบัญชีที่สร้างหรือรีเซ็ตในหน้านี้ บัญชีอื่นจะแสดงสถานะแทน ถ้าต้องออกรหัสให้ทุกคน ให้ติ๊กเลือกแล้วกด “รีเซ็ตรหัสที่เลือก”</div>
+        </div>
+      )}
       <div className="tw"><table>
-        <thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead>
+        <thead><tr>{isSuper && <th style={{ width: 36 }}><input type="checkbox" checked={allSel} onChange={() => setSel(allSel ? new Set() : new Set(selectable.map((u) => u.uid)))} aria-label="เลือกทั้งหมด" /></th>}<th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead>
         <tbody>
-          {[...list].sort((x, y) => String(x.username).localeCompare(String(y.username), 'en', { numeric: true })).map((u) => (
+          {sortedList.map((u) => (
             <tr key={u.uid} style={u.active === false ? { opacity: 0.6 } : undefined}>
+              {isSuper && <td>{u.role !== 'superadmin' && <input type="checkbox" checked={sel.has(u.uid)} onChange={() => toggleSel(u.uid)} aria-label={`เลือก ${u.username}`} />}</td>}
               <td>{u.username}</td><td>{u.name}</td><td>{ROLE_LABEL[u.role] || u.role}</td>
               <td><span className={`pill ${u.active === false ? 'p-warn' : 'p-good'}`}>{u.active === false ? 'ปิดใช้งาน' : 'ใช้งาน'}</span></td>
               <td>{isSuper && u.role !== 'superadmin' && (
