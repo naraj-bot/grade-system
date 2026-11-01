@@ -1,6 +1,6 @@
 // POST /api/users  (ต้องส่ง Authorization: Bearer <Firebase ID token>)
 //  { action: 'create', username, name, role, tempPassword }  -> สร้างผู้ใช้ (แอดมินหลัก/แอดมินโรงเรียน)
-//  { action: 'reset',  uid, tempPassword }                   -> รีเซ็ตรหัส (แอดมินหลักเท่านั้น)
+//  { action: 'reset',  uid, tempPassword }                   -> รีเซ็ตรหัส (แอดมินหลักและแอดมินโรงเรียน; รีเซ็ตบัญชีแอดมินหลักและบัญชีตัวเองไม่ได้)
 //  { action: 'update', uid, name?, role? }                   -> แก้ชื่อ/บทบาท (แอดมินหลักเท่านั้น)
 //  { action: 'setActive', uid, active }                      -> เปิด/ปิดใช้งานบัญชี (แอดมินหลักเท่านั้น)
 //  { action: 'delete', uid }                                 -> ลบบัญชี (แอดมินหลักเท่านั้น)
@@ -49,17 +49,19 @@ export default async function handler(req, res) {
       return send(res, 200, { uid: created.uid })
     }
 
-    // ต่อไปนี้ เฉพาะแอดมินหลัก
-    const caller = await requireRole(req, ['superadmin'])
-
+    // รีเซ็ตรหัส: แอดมินหลักและแอดมินโรงเรียนทำได้ (target() กันไม่ให้รีเซ็ตแอดมินหลักและตัวเอง)
     if (action === 'reset') {
       if (!tempPassword || tempPassword.length < 6) throw fail(400, 'รหัสผ่านเริ่มต้นต้องยาวอย่างน้อย 6 ตัว')
+      const caller = await requireRole(req, ['superadmin', 'schooladmin'])
       await target(uid, caller)
       await adminAuth.updateUser(uid, { password: tempPassword })
       await adminAuth.revokeRefreshTokens(uid)
       await adminDb.doc(`users/${uid}`).update({ mustChangePassword: true })
       return send(res, 200, { ok: true })
     }
+
+    // ต่อไปนี้ เฉพาะแอดมินหลัก
+    const caller = await requireRole(req, ['superadmin'])
 
     if (action === 'update') {
       await target(uid, caller)

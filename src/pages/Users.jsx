@@ -108,7 +108,7 @@ export default function Users() {
   useEffect(() => {
     const q = isSuper
       ? collection(db, 'users')
-      : query(collection(db, 'users'), where('role', '==', 'teacher'))
+      : query(collection(db, 'users'), where('role', 'in', ['teacher', 'schooladmin']))
     return onSnapshot(q, (s) => setList(s.docs.map((d) => ({ uid: d.id, ...d.data() }))))
   }, [isSuper])
 
@@ -190,7 +190,7 @@ export default function Users() {
     catch (err) { tell({ title: 'สร้างภาพไม่สำเร็จ', text: err.message, tone: 'warn' }) }
     setBusy(false)
   }
-  const selectable = sortedList.filter((u) => u.role !== 'superadmin')
+  const selectable = sortedList.filter((u) => u.role !== 'superadmin' && u.uid !== user.uid)
   const allSel = selectable.length > 0 && selectable.every((u) => sel.has(u.uid))
   const toggleSel = (uid) => setSel((s0) => { const n = new Set(s0); n.has(uid) ? n.delete(uid) : n.add(uid); return n })
   const bulkReset = async () => {
@@ -252,29 +252,32 @@ export default function Users() {
           <span className="small muted">รหัสแสดงได้เฉพาะตอนสร้าง/รีเซ็ตเท่านั้น พิมพ์เก็บไว้แจกครู</span>
         </div>
       )}
-      {isSuper && (
+      {(
         <div className="card stack">
           <div className="row">
             <button className="btn sm" disabled={busy} onClick={exportSheet}>ดาวน์โหลดรายชื่อบัญชี (ภาพ A4)</button>
+            <button className="btn sm alt" disabled={busy} onClick={() => setSel(new Set(selectable.filter((u) => u.mustChangePassword).map((u) => u.uid)))}>เลือกเฉพาะที่ยังไม่เคยเข้าสู่ระบบ ({selectable.filter((u) => u.mustChangePassword).length})</button>
             <button className="btn sm alt" disabled={busy || !sel.size} onClick={bulkReset}>รีเซ็ตรหัสที่เลือก ({sel.size}) แล้วออกภาพ A4</button>
           </div>
-          <div className="small muted">ระบบไม่เก็บรหัสเดิมไว้ดู ภาพจะมีรหัสผ่านเฉพาะบัญชีที่สร้างหรือรีเซ็ตในหน้านี้ บัญชีอื่นจะแสดงสถานะแทน ถ้าต้องออกรหัสให้ทุกคน ให้ติ๊กเลือกแล้วกด “รีเซ็ตรหัสที่เลือก”</div>
+          <div className="small muted">ระบบไม่เก็บรหัสเดิมไว้ดู ภาพจะมีรหัสผ่านเฉพาะบัญชีที่สร้างหรือรีเซ็ตในหน้านี้ บัญชีอื่นจะแสดงสถานะแทน ถ้าต้องออกรหัสให้ครู ให้กด “เลือกเฉพาะที่ยังไม่เคยเข้าสู่ระบบ” (คนที่ตั้งรหัสเองแล้วจะไม่ถูกรีเซ็ต) แล้วกด “รีเซ็ตรหัสที่เลือก”</div>
         </div>
       )}
       <div className="tw"><table>
-        <thead><tr>{isSuper && <th style={{ width: 36 }}><input type="checkbox" checked={allSel} onChange={() => setSel(allSel ? new Set() : new Set(selectable.map((u) => u.uid)))} aria-label="เลือกทั้งหมด" /></th>}<th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead>
+        <thead><tr>{<th style={{ width: 36 }}><input type="checkbox" checked={allSel} onChange={() => setSel(allSel ? new Set() : new Set(selectable.map((u) => u.uid)))} aria-label="เลือกทั้งหมด" /></th>}<th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead>
         <tbody>
           {sortedList.map((u) => (
             <tr key={u.uid} style={u.active === false ? { opacity: 0.6 } : undefined}>
-              {isSuper && <td>{u.role !== 'superadmin' && <input type="checkbox" checked={sel.has(u.uid)} onChange={() => toggleSel(u.uid)} aria-label={`เลือก ${u.username}`} />}</td>}
+              {<td>{u.role !== 'superadmin' && u.uid !== user.uid && <input type="checkbox" checked={sel.has(u.uid)} onChange={() => toggleSel(u.uid)} aria-label={`เลือก ${u.username}`} />}</td>}
               <td>{u.username}</td><td>{u.name}</td><td>{ROLE_LABEL[u.role] || u.role}</td>
               <td><span className={`pill ${u.active === false ? 'p-warn' : 'p-good'}`}>{u.active === false ? 'ปิดใช้งาน' : 'ใช้งาน'}</span></td>
-              <td>{isSuper && u.role !== 'superadmin' && (
+              <td>{u.role !== 'superadmin' && u.uid !== user.uid && (
                 <div className="row" style={{ flexWrap: 'nowrap' }}>
                   <button className="btn sm alt" onClick={() => askReset(u)}>รีเซ็ตรหัสผ่าน</button>
-                  <button className="btn sm alt" onClick={() => setEditing(u)}>แก้ไข</button>
-                  <button className="btn sm alt" onClick={() => toggleActive(u)}>{u.active === false ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</button>
-                  <button className="btn sm danger" onClick={() => remove(u)}>ลบ</button>
+                  {isSuper && <>
+                    <button className="btn sm alt" onClick={() => setEditing(u)}>แก้ไข</button>
+                    <button className="btn sm alt" onClick={() => toggleActive(u)}>{u.active === false ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</button>
+                    <button className="btn sm danger" onClick={() => remove(u)}>ลบ</button>
+                  </>}
                 </div>
               )}</td>
             </tr>
