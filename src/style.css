@@ -333,3 +333,13 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .astb.asส{background:#f3e6fb;color:#7b2fa0;border-color:#d8b9ec}.astb.asน{background:#e9e0dc;color:#5d4037;border-color:#c9b9b2}
 .attm{min-width:max-content}
 .dlg p{white-space:pre-line}
+
+/* หัวตารางลอยเมื่อเลื่อน / ตารางประเมินแบบกะทัดรัด */
+.tw.hd{overflow:auto;max-height:calc(100vh - 110px)}
+.tw.hd thead th{position:sticky;top:0;z-index:4}
+.tw.hd.stk thead tr:first-child th:nth-child(-n+2){z-index:6}
+.tw.evc th,.tw.evc td{padding:2px 6px;font-size:.84rem}
+.tw.evc select{padding:1px 2px;font-size:.84rem;min-height:0;height:24px;width:auto;min-width:38px}
+.tw.evc th:nth-child(2),.tw.evc td:nth-child(2){max-width:190px;overflow:hidden;text-overflow:ellipsis}
+.attm th.hol,.attm td.hol{background:repeating-linear-gradient(135deg,#f3e9e4,#f3e9e4 6px,#e9dcd5 6px,#e9dcd5 12px);color:#8a7a76;text-align:center}
+.attm td.hol{font-weight:700}

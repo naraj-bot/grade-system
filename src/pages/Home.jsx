@@ -70,6 +70,7 @@ export default function Home() {
         <div className="row">
           <button className="btn" onClick={() => nav('/reg')}>{admin ? 'ตรวจการลงทะเบียน' : 'ลงทะเบียนสอน'}</button>
           {admin && <button className="btn alt" onClick={() => nav('/students')}>นักเรียน</button>}
+          <button className="btn alt" onClick={() => nav('/progress')}>{admin ? 'ความคืบหน้าการบันทึกผล' : 'วิชาที่บันทึก/ส่งแล้ว'}</button>
         </div>
       </div>
       {!admin && (

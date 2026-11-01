@@ -13,7 +13,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const LOGO = location.origin + '/logo.png'
 const LEVELS = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3']
 const isPri = (l) => l.startsWith('ป.')
-const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'summary', 'sign', 'school', 'guide', 'att']
+const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'summary', 'sign', 'school', 'guide', 'att', 'progress']
 
 let CAT = []
 let STU = []
@@ -33,11 +33,11 @@ const defaultSchool = () => ({
 })
 const S = {
   page: 'scores', term: 1, year: 0, role: '', scCode: null,
-  scores: {}, cfg: {}, ab: {}, rs: {}, ev: {}, sign: {}, fix: {}, meta: {}, acts: {}, members: {}, rpt: {}, att: {},
+  scores: {}, cfg: {}, ab: {}, rs: {}, ev: {}, sign: {}, fix: {}, meta: {}, acts: {}, members: {}, rpt: {}, att: {}, sub: {},
   sigs: {}, school: defaultSchool(), guidance: 'none', regs: [], openSubj: new Set(), notes: [],
   evKind: 'a', actLevel: 'ป.3', rpLevel: 'ป.3', rpStu: null, clubLv: 'ป.3', allSubj: false, sumLv: null,
 }
-const BUCKETS = ['scores', 'cfg', 'ab', 'rs', 'ev', 'sign', 'fix', 'meta', 'acts', 'members', 'rpt', 'att']
+const BUCKETS = ['scores', 'cfg', 'ab', 'rs', 'ev', 'sign', 'fix', 'meta', 'acts', 'members', 'rpt', 'att', 'sub']
 
 const me = () => USERS[S.role]
 const isAdmin = () => me().kind !== 'teacher'
@@ -87,42 +87,165 @@ function calc(code,T){T=T||S.term;const c=CAT.find(x=>x.code===code),pri=isPri(c
   return {s,v,a,mid,fin,tot,cur,pr,att,pct,sum,g,ms};});}
 const f1=x=>x==null?'-':(Math.round(x*10)/10).toString();
 function pickSubject(){const codes=myCodes();if(!codes.length)return null;if(!S.scCode||!codes.includes(S.scCode))S.scCode=codes[0];return codes;}
-function subjectSelect(codes,noRatio){return `${isAdmin()?`<label class="small"><input type="checkbox" id="allsubj" ${S.allSubj?'checked':''}> แสดงทุกวิชาของโรงเรียน (ไม่ติ๊ก = เฉพาะวิชาที่ฉันสอน)</label>`:''}<label for="sub">วิชา</label><select id="sub">${codes.map(k=>{const x=CAT.find(y=>y.code===k);return `<option value="${k}" ${k===S.scCode?'selected':''}>${x.level} ${k} ${esc(x.name)}</option>`}).join('')}</select>
+function subjectSelect(codes,noRatio){return `${isAdmin()?`<label class="small"><input type="checkbox" id="allsubj" ${S.allSubj?'checked':''}> แสดงทุกวิชาของโรงเรียน (ไม่ติ๊ก = เฉพาะวิชาที่ฉันสอน)</label>`:''}<label for="sub">วิชา</label><select id="sub">${codes.map(k=>{const x=CAT.find(y=>y.code===k);return `<option value="${k}" ${k===S.scCode?'selected':''}>${progMark(k)}${x.level} ${k} ${esc(x.name)}</option>`}).join('')}</select>
  ${noRatio?'':`<label for="rt">สัดส่วน</label><select id="rt">${['60:40','70:30','80:20'].map(x=>`<option ${x===(cfgOf(S.scCode).ratio||'70:30')?'selected':''}>${x}</option>`).join('')}</select>`}
  <div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${S.term===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>`;}
+
+
+/* ---------- ความคืบหน้า / ส่งผลการเรียน ---------- */
+const SUBK=(code,T)=>code+'|'+T;
+function progOf(code,T){
+  const c=CAT.find(x=>x.code===code),pri=isPri(c.level),R=calc(code,T),n=R.length;
+  const hasSc=r=>((r.v.c||[]).some(x=>x!==''&&x!=null))||(r.v.f!==''&&r.v.f!=null);
+  const full=R.filter(r=>r.tot!=null).length,any=R.filter(hasSc).length;
+  const needEv=!pri||T===2,em=needEv?evMiss(code,T,R):0;
+  const sub=S.sub[SUBK(code,T)]||null;
+  const st=sub?'sent':!n?'none':full===n?'full':any?'part':'none';
+  return {c,pri,n,full,any,att:attHas(code,T),needEv,em,sub,st};
+}
+const PST={sent:['ส่งผลแล้ว','p-good'],full:['กรอกครบ ยังไม่ส่ง','p-gold'],part:['กำลังกรอก','p-warn'],none:['ยังไม่เริ่ม','p-bad'],noteacher:['ยังไม่มีครูสอน','p-bad']};
+function progMark(code){try{const p=progOf(code,S.term);return p.st==='sent'?'✔ ':p.st==='full'?'● ':p.st==='part'?'◐ ':'○ ';}catch(e){return '';}}
+function progRows(){
+  const T=S.term,okc=c=>c&&(isPri(c.level)||c.term===T);
+  const regs=S.regs.filter(r=>r.status==='ok'&&(isAdmin()||r.t===S.role));
+  const seen=new Set(),out=[];
+  regs.forEach(r=>r.codes.forEach(code=>{const c=CAT.find(x=>x.code===code);if(!okc(c)||seen.has(code))return;seen.add(code);
+    let tn='-';try{tn=(USERS[r.t]&&USERS[r.t].name)||r.name||'-';}catch(e){}
+    out.push({code,c,teacher:tn,p:progOf(code,T)});}));
+  if(isAdmin())CAT.filter(c=>S.openSubj.has(c.code)&&okc(c)&&!seen.has(c.code)).forEach(c=>out.push({code:c.code,c,teacher:'-',p:{...progOf(c.code,T),st:'noteacher'},nt:true}));
+  return out.sort((a,b)=>a.c.level.localeCompare(b.c.level,'th')||a.code.localeCompare(b.code));
+}
+function submitSubject(code){
+  const T=S.term,p=progOf(code,T);if(S.tpl)return;
+  const warn=[];if(!p.att)warn.push('ยังไม่มีข้อมูลเวลาเรียน (เช็คชื่อ/ชั่วโมงที่ขาด)');
+  if(p.full<p.n)return toast('ยังกรอกคะแนนไม่ครบ ('+p.full+'/'+p.n+' คน) ส่งผลไม่ได้');
+  if(p.em)return toast('ยังประเมินผู้เรียนไม่ครบ '+p.em+' คน (คุณลักษณะ/อ่านคิดวิเคราะห์เขียน/สมรรถนะ) ส่งผลไม่ได้');
+  const go=()=>{S.sub[SUBK(code,T)]={at:Date.now(),by:S.role,name:me().name};persist();notify('admins',`${me().name} ส่งผลการเรียน ${code} ${p.c.name} ภาคเรียนที่ ${T} แล้ว`,'progress');toast('ส่งผลการเรียนแล้ว');render();};
+  ask({title:'ส่งผลการเรียนวิชานี้?',text:`${code} ${p.c.name} ภาคเรียนที่ ${T}${warn.length?'\n\nข้อสังเกต:\n• '+warn.join('\n• '):''}\n\nแอดมินจะเห็นว่าส่งแล้ว (ส่งกลับให้แก้ไขได้ภายหลัง)`,ok:'ส่งผลการเรียน',cancel:'ยังไม่ส่ง'}).then(y=>{if(y)go();});
+}
+function unsubmitSubject(code){
+  const T=S.term;const s=S.sub[SUBK(code,T)];if(!s||S.tpl)return;
+  ask({title:isAdmin()?'ส่งกลับให้ครูแก้ไข?':'ยกเลิกการส่งผล?',text:`${code} ภาคเรียนที่ ${T} จะกลับเป็นสถานะ "ยังไม่ส่ง"`,ok:'ยืนยัน',cancel:'ไม่ทำ',danger:true}).then(y=>{if(!y)return;delete S.sub[SUBK(code,T)];persist();if(isAdmin()&&s.by&&s.by!==S.role)notify(s.by,`แอดมินส่งผลการเรียน ${code} ภาคเรียนที่ ${T} กลับให้แก้ไข`,'progress');toast('ยกเลิกการส่งแล้ว');render();});
+}
+
+function evKindMiss(code,T,R,k){const K=EVK.find(x=>x[0]===k),st=S.ev[code+'|'+T]||{};return R.filter(r=>!evOverall((st[r.s.id]||{})[k],K[3].length)).length;}
+function stepBar(c,R,cur){
+  const T=S.term,pri=isPri(c.level),needEv=!pri||T===2;
+  const steps=[['scores','',1,'บันทึกคะแนน',R.length>0&&R.every(r=>r.tot!=null)]];
+  if(needEv)EVK.forEach((x,i)=>steps.push(['eval',x[0],i+2,x[2],R.length>0&&evKindMiss(c.code,T,R,x[0])===0]));
+  const sub=!!S.sub[c.code+'|'+T];
+  steps.push(['scores','sub',steps.length+1,'ส่งผลการเรียน',sub]);
+  return `<div class="row" style="gap:6px;flex-wrap:wrap" aria-label="ขั้นตอนการบันทึกวิชานี้">${steps.map(([pg,k,n,t,done])=>{const on=cur===(pg+':'+k);return `<button class="chip" aria-pressed="${on}" data-nx="${pg}|${k}">${done?'✔':n} ${t}</button>`;}).join('<span class="muted">›</span>')}</div>`;
+}
+function nextBtn(c,R,cur){
+  const T=S.term,pri=isPri(c.level),needEv=!pri||T===2;
+  const seq=[['scores','','บันทึกคะแนน']];if(needEv)EVK.forEach(x=>seq.push(['eval',x[0],x[2]]));
+  const i=seq.findIndex(x=>(x[0]+':'+x[1])===cur),n=seq[i+1];
+  const done=cur==='scores:'?(R.length>0&&R.every(r=>r.tot!=null)):evKindMiss(c.code,T,R,cur.split(':')[1])===0;
+  return `<div class="card row" style="justify-content:space-between"><span class="small">${done?'✔ ขั้นนี้ครบแล้ว':'ยังกรอกขั้นนี้ไม่ครบ (ข้ามไปก่อนได้ แต่ต้องครบทุกขั้นถึงจะส่งผลได้)'}</span>${n?`<button class="btn ${done?'':'alt'}" data-nx="${n[0]}|${n[1]}">ถัดไป: ${n[2]} ▶</button>`:`<button class="btn ${done?'':'alt'}" data-nx="scores|sub">เสร็จแล้ว ไปส่งผลการเรียน ▶</button>`}</div>`;
+}
+function subCard(c,R){
+  const p=progOf(c.code,S.term);if(!p.n)return '';
+  const when=p.sub?new Date(p.sub.at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'}):'';
+  return `<div class="card row" style="justify-content:space-between"><span class="small"><span class="pill ${PST[p.st][1]}">${PST[p.st][0]}</span> กรอกคะแนนครบ ${p.full}/${p.n} คน${p.sub?` · ส่งเมื่อ ${when} โดย ${esc(p.sub.name||'')}`:''}</span>${p.sub?`<button class="btn sm alt" data-act="unsub" data-c="${c.code}">${isAdmin()?'ส่งกลับให้แก้ไข':'ยกเลิกการส่ง'}</button>`:`<button class="btn sm" data-act="dosub" data-c="${c.code}" ${p.full<p.n||p.em?`disabled title="${p.full<p.n?'กรอกคะแนนให้ครบทุกคนก่อน':'ประเมินผู้เรียนให้ครบทุกหมวดก่อน'}"`:''}>ส่งผลการเรียน</button>`}</div>`;
+}
+P.progress=()=>{
+  const rows=progRows(),T=S.term,F=S.pgF||'all';
+  if(!rows.length)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
+  const cnt=k=>rows.filter(r=>r.p.st===k).length;
+  const list=rows.filter(r=>F==='all'||r.p.st===F);
+  const chip=(k,t)=>`<button class="chip" aria-pressed="${F===k}" data-pgf="${k}">${t}</button>`;
+  const bar=r=>`<div style="background:#eee;border-radius:99px;height:8px;min-width:70px;overflow:hidden"><div style="width:${r.p.n?Math.round(r.p.full/r.p.n*100):0}%;height:8px;background:${r.p.st==='sent'?'#2e7d32':'#c4883a'}"></div></div>`;
+  const tr=list.map(r=>{const p=r.p;return `<tr><td><b>${r.code}</b><div class="small muted">${esc(r.c.name)}</div></td><td>${r.c.level}</td>${isAdmin()?`<td>${esc(r.teacher)}</td>`:''}<td class="num">${p.n}</td>
+   <td>${r.nt?'-':`${p.full}/${p.n}${bar(r)}`}</td><td>${r.nt?'-':p.att?'<span class="pill p-good">มีแล้ว</span>':'<span class="pill p-warn">ยังไม่มี</span>'}</td>
+   <td>${r.nt?'-':!p.needEv?'<span class="small muted">ไม่ต้อง</span>':p.em?`<span class="pill p-warn">ขาด ${p.em} คน</span>`:p.n?'<span class="pill p-good">ครบ</span>':'-'}</td>
+   <td><span class="pill ${PST[p.st][1]}">${PST[p.st][0]}</span>${p.sub?`<div class="small muted">${new Date(p.sub.at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'})}</div>`:''}</td>
+   <td>${r.nt?'':`<button class="btn sm alt" data-go="scores@${r.code}">เปิด</button>${p.sub?` <button class="btn sm alt" data-act="unsub" data-c="${r.code}">${isAdmin()?'ส่งกลับ':'ยกเลิกส่ง'}</button>`:p.st==='full'&&!isAdmin()?` <button class="btn sm" data-act="dosub" data-c="${r.code}">ส่งผล</button>`:''}`}</td></tr>`;}).join('');
+  return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>
+  <div class="grid"><div class="card kpi"><b>${rows.length}</b>วิชาทั้งหมด</div><div class="card kpi"><b style="color:#2e7d32">${cnt('sent')}</b>ส่งผลแล้ว</div><div class="card kpi"><b>${cnt('full')}</b>กรอกครบ รอส่ง</div><div class="card kpi"><b>${cnt('part')+cnt('none')+cnt('noteacher')}</b>ยังไม่เสร็จ</div></div>
+  <div class="card stack"><h3>${isAdmin()?'ความคืบหน้าการบันทึกผลทุกวิชา':'วิชาของฉัน: บันทึกแล้วหรือยัง'} · ภาคเรียนที่ ${T}</h3>
+  <div class="small muted">ส่งผลได้เมื่อกรอกคะแนนครบทุกคน ${T===1?'· ประถมภาคเรียนที่ 1 ยังไม่ตัดเกรด แต่ส่งผลคะแนนได้':''}</div>
+  <div class="row">${chip('all','ทั้งหมด '+rows.length)}${chip('sent','ส่งแล้ว '+cnt('sent'))}${chip('full','รอส่ง '+cnt('full'))}${chip('part','กำลังกรอก '+cnt('part'))}${chip('none','ยังไม่เริ่ม '+cnt('none'))}${isAdmin()&&cnt('noteacher')?chip('noteacher','ไม่มีครู '+cnt('noteacher')):''}</div>
+  <div class="tw"><table><thead><tr><th>วิชา</th><th>ชั้น</th>${isAdmin()?'<th>ครูผู้สอน</th>':''}<th>นักเรียน</th><th>กรอกคะแนนครบ</th><th>เวลาเรียน</th><th>ประเมิน</th><th>สถานะ</th><th></th></tr></thead><tbody>${tr||'<tr><td colspan="9" class="muted">ไม่มีรายการในกลุ่มนี้</td></tr>'}</tbody></table></div></div></div>`;
+};
+reg('click',e=>{const nx=e.target.closest('[data-nx]');if(nx&&$('#view')&&$('#view').contains(nx)){const [pg,k]=nx.dataset.nx.split('|');if(pg==='eval'&&k)S.evKind=k;if(S.page===pg)render();else CTX.go(pg);if(k==='sub')setTimeout(()=>{const b=document.querySelector('[data-act=dosub],[data-act=unsub]');if(b&&b.scrollIntoView)b.scrollIntoView({block:'center'});},120);return;}
+ const t=e.target.closest('[data-pgf],[data-act=dosub],[data-act=unsub]');if(!t||!$('#view')||!$('#view').contains(t))return;
+  if(t.dataset.pgf){S.pgF=t.dataset.pgf;render();return;}
+  if(t.dataset.act==='dosub')submitSubject(t.dataset.c||S.scCode);else unsubmitSubject(t.dataset.c||S.scCode);});
 
 /* ---------- เช็คชื่อรายวัน ---------- */
 const ATC=['','ข','ล','ป','ส','น'],ATN={'':'มา',ข:'ขาด',ล:'ลากิจ',ป:'ป่วย',ส:'สาย',น:'หนีเรียน'},ATABS='ขลปน';
 const attKey=(code,T)=>code+'|'+T;
 const attOf=(code,T)=>S.att[attKey(code,T)]||(S.att[attKey(code,T)]={days:[],m:{}});
 const attHas=(code,T)=>{const x=S.att[attKey(code,T)];return !!(x&&x.days&&x.days.length);};
-function attAbs(code,T,sid){const x=S.att[attKey(code,T)];if(!x||!x.days||!x.days.length)return null;const m=(x.m||{})[sid]||{};let n=0;x.days.forEach(d=>{const st=m[d.d];if(st&&ATABS.includes(st))n+=(+d.h>0?+d.h:1);});return n;}
+function attAbs(code,T,sid){const x=S.att[attKey(code,T)];if(!x||!x.days||!x.days.length)return null;const m=(x.m||{})[sid]||{};let n=0;x.days.forEach(d=>{if(d.x)return;const st=m[d.d];if(st&&ATABS.includes(st))n+=(+d.h>0?+d.h:1);});return n;}
 const isoD=dt=>dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
 const dShort=iso=>{const q=iso.split('-');return (+q[2])+'/'+(+q[1]);};
 const MSHORT=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 function attRender(){const w=document.querySelector('#view .tw'),l=w?w.scrollLeft:0,y=window.scrollY;render();const w2=document.querySelector('#view .tw');if(w2)w2.scrollLeft=l;window.scrollTo(0,y);}
+
+const calOf=()=>{const sc=S.school;sc.cal=sc.cal||{};[1,2].forEach(t=>{sc.cal[t]=sc.cal[t]||{open:'',close:''}});sc.cal.hol=sc.cal.hol||[];return sc.cal;};
+const holSet=()=>{const set=new Map();calOf().hol.forEach(h=>{const d=new Date(h.f+'T00:00:00'),e=new Date((h.t||h.f)+'T00:00:00');let n=0;while(d<=e&&n++<120){set.set(isoD(d),h.n||'วันหยุด');d.setDate(d.getDate()+1);}});return set;};
+const DOWN=['อา','จ','อ','พ','พฤ','ศ','ส'];
+const mondayOf=iso=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()-((d.getDay()+6)%7));return isoD(d);};
+function attWeeks(days){const m=new Map();days.forEach(x=>{const k=mondayOf(x.d);(m.get(k)||m.set(k,[]).get(k)).push(x);});return [...m.entries()].sort((a,b)=>a[0]<b[0]?-1:1);}
+function attGen(f,e2){
+  const c=S.scCode,T=S.term,A=attOf(c,T),tt=(A.tt&&A.tt.h)||{},hol=holSet();
+  if(!Object.values(tt).some(v=>+v>0))return toast('เลือกวันที่สอนและจำนวนชั่วโมงในตารางสอนก่อน');
+  if(!f||!e2||e2<f)return toast('ตั้งวันเปิด-ปิดภาคเรียนให้ถูกต้องก่อน');
+  const have=new Set(A.days.map(x=>x.d));let n=0,skip=0;const d=new Date(f+'T00:00:00'),end=new Date(e2+'T00:00:00');
+  while(d<=end&&n<400){const iso=isoD(d),h=+tt[d.getDay()]||0;if(h>0){if(hol.has(iso)){skip++;if(!have.has(iso)){A.days.push({d:iso,h,x:hol.get(iso)});have.add(iso);}}else if(!have.has(iso)){A.days.push({d:iso,h});have.add(iso);n++;}}d.setDate(d.getDate()+1);}
+  A.days.sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);S.attWk=null;
+  const tot=A.days.filter(x=>!x.x).reduce((p,x)=>p+(+x.h||1),0),H=cfgOf(c,T).hours;
+  toast(`สร้างวันเรียน ${n} วัน (รวม ${A.days.filter(x=>!x.x).length} วัน ${tot} ชม.) วันหยุดที่ขีดไว้ ${skip} วัน`);attRender();
+  if(tot!==H)ask({title:'ปรับชั่วโมงเรียนทั้งหมดตามที่สร้าง ?',text:`ตอนนี้ตั้งไว้ ${H} ชม. แต่วันเรียนที่สร้างรวม ${tot} ชม.\\nให้ตั้งชั่วโมงทั้งหมดเป็น ${tot} ชม. เพื่อคิดร้อยละเวลาเรียนและ มส. ?`,ok:`ตั้งเป็น ${tot} ชม.`,cancel:'คงเดิม'}).then(y=>{if(y){cfgOf(c,T).hours=tot;attRender();}});
+}
+function genCard(c,A){
+  const T=S.term,cal=calOf()[T],tt=(A.tt&&A.tt.h)||{};
+  return `<div class="card stack"><h3>ตารางสอนและสร้างวันเรียนทั้งภาคเรียน</h3>
+  <div class="small muted">เลือกวันที่สอนในแต่ละสัปดาห์และจำนวนชั่วโมง แล้วกดสร้าง ระบบจะใส่วันเรียนทั้งภาคเรียนให้ทันที (ข้ามวันหยุดที่แอดมินตั้งไว้) จากนั้นค่อยเช็คชื่อทีละสัปดาห์</div>
+  <div class="row">${[1,2,3,4,5].map(d=>`<label class="small" style="display:flex;flex-direction:column;align-items:center;gap:2px">วัน${DOWN[d]}<select data-ttd="${d}" aria-label="ชั่วโมงสอนวัน${DOWN[d]}">${[0,1,2,3,4].map(h=>`<option value="${h}" ${(+tt[d]||0)===h?'selected':''}>${h?h+' ชม.':'ไม่สอน'}</option>`).join('')}</select></label>`).join('')}</div>
+  <div class="row"><label for="genf">เปิดเรียน</label><input id="genf" type="date" value="${cal.open||''}"><label for="gent">ปิดเรียน</label><input id="gent" type="date" value="${cal.close||''}"><button class="btn sm" data-at="gen">สร้างวันเรียนทั้งภาคเรียน</button></div>
+  ${cal.open&&cal.close?`<div class="small muted">วันเปิด-ปิดเรียนดึงจากปฏิทินที่แอดมินตั้งไว้ · วันหยุดในปฏิทิน ${calOf().hol.length} รายการ</div>`:'<div class="small" style="color:var(--bad)">แอดมินยังไม่ตั้งปฏิทินภาคเรียนนี้ (เมนูตั้งค่าโรงเรียน) กรอกวันเปิด-ปิดเองได้ แต่จะไม่ข้ามวันหยุดให้</div>'}</div>`;
+}
+function calCard(){
+  const cal=calOf();
+  return `<div class="card stack"><h3>ปฏิทินภาคเรียน (วันเปิด-ปิด และวันหยุด)</h3><div class="small muted">ตั้งครั้งเดียว ครูทุกคนจะดึงไปสร้างวันเรียนในหน้าเช็คชื่อได้ทันที เสาร์-อาทิตย์ไม่นับอยู่แล้ว เพิ่มเฉพาะวันหยุดราชการ/หยุดพิเศษ</div>
+  ${[1,2].map(t=>`<div class="row"><b>ภาคเรียนที่ ${t}</b><label for="co${t}">เปิดเรียน</label><input id="co${t}" type="date" data-cal="${t}.open" value="${cal[t].open||''}"><label for="cc${t}">ปิดเรียน</label><input id="cc${t}" type="date" data-cal="${t}.close" value="${cal[t].close||''}"></div>`).join('')}
+  <div class="row"><button class="btn sm" data-act="holstd">เพิ่มวันหยุดราชการประจำปีที่วันที่คงที่</button><span class="small muted">วันพระใหญ่ (มาฆบูชา วิสาขบูชา อาสาฬหบูชา เข้าพรรษา) และวันหยุดชดเชย เพิ่มเองด้านล่าง เพราะเปลี่ยนทุกปี</span></div>
+  <div class="row"><b>เพิ่มวันหยุด</b><input id="hf" type="date" aria-label="วันที่เริ่ม"><span class="small">ถึง</span><input id="ht" type="date" aria-label="ถึงวันที่ (ถ้าหยุดหลายวัน)"><input id="hn" placeholder="ชื่อวันหยุด" size="18"><button class="btn sm" data-act="holadd">เพิ่ม</button></div>
+  ${cal.hol.length?`<div class="tw"><table><thead><tr><th>วันที่</th><th>ชื่อ</th><th></th></tr></thead><tbody>${cal.hol.map((h,i)=>({h,i})).sort((a,b)=>a.h.f<b.h.f?-1:1).map(({h,i})=>`<tr><td>${dShort(h.f)}${h.t&&h.t!==h.f?' – '+dShort(h.t):''} ${(h.f||'').slice(0,4)}</td><td>${esc(h.n||'')}</td><td><button class="btn sm alt" data-act="holdel" data-i="${i}">ลบ</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="small muted">ยังไม่มีวันหยุด</div>'}</div>`;
+}
 function attAddDays(list,h){const c=S.scCode,A=attOf(c,S.term),have=new Set(A.days.map(x=>x.d));let n=0;list.forEach(d=>{if(!have.has(d)){A.days.push({d,h});have.add(d);n++;}});A.days.sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);return n;}
 P.att=()=>{
  const codes=pickSubject();
  if(!codes)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
  const c=CAT.find(x=>x.code===S.scCode),T=S.term,A=attOf(c.code,T),R=calc(c.code,T),H=cfgOf(c.code,T).hours,days=A.days;
  const ids=new Set(R.map(r=>r.s.id));S.attS=(S.attS||[]).filter(i=>ids.has(i));S.attD=(S.attD||[]).filter(d=>days.some(x=>x.d===d));
- const totH=days.reduce((p,x)=>p+(+x.h||1),0),ym=days.length?days[0].d.slice(0,4):String(new Date().getFullYear());
- const head=days.map(x=>`<th class="atd"><label><input type="checkbox" data-ad="${x.d}" ${S.attD.includes(x.d)?'checked':''} aria-label="เลือกวันที่ ${dShort(x.d)}"><br><b>${dShort(x.d)}</b></label><div class="small muted">${x.h} ชม.</div></th>`).join('');
+ const wks=attWeeks(days),today=isoD(new Date());
+ if(S.attWk!=='all'&&!wks.some(w=>w[0]===S.attWk)){const cur=wks.find(w=>w[0]===mondayOf(today));const past=wks.filter(w=>w[0]<=today);S.attWk=wks.length?(cur||past[past.length-1]||wks[0])[0]:null;}
+ const vd=S.attWk==='all'||!wks.length?days:(wks.find(w=>w[0]===S.attWk)||[0,days])[1];S.attVis=vd.map(x=>x.d);
+ const wi=wks.findIndex(w=>w[0]===S.attWk),wl=w=>dShort(w[1][0].d)+(w[1].length>1?'–'+dShort(w[1][w[1].length-1].d):'');
+ const wkBar=wks.length?`<div class="row"><button class="btn sm alt" data-at="wkprev" ${wi<=0?'disabled':''}>◀ สัปดาห์ก่อน</button><select id="attwk" aria-label="เลือกสัปดาห์">${wks.map((w,i)=>`<option value="${w[0]}" ${w[0]===S.attWk?'selected':''}>สัปดาห์ที่ ${i+1} (${wl(w)})</option>`).join('')}<option value="all" ${S.attWk==='all'?'selected':''}>ดูทั้งภาคเรียน</option></select><button class="btn sm alt" data-at="wknext" ${wi<0||wi>=wks.length-1?'disabled':''}>สัปดาห์ถัดไป ▶</button><span class="small muted">แสดง ${vd.length} วัน จากทั้งหมด ${days.length} วัน</span></div>`:'';
+ const nHol=days.filter(x=>x.x).length,totH=days.filter(x=>!x.x).reduce((p,x)=>p+(+x.h||1),0),xset=new Set(days.filter(x=>x.x).map(x=>x.d)),ym=days.length?days[0].d.slice(0,4):String(new Date().getFullYear());
+ const head=vd.map(x=>x.x?`<th class="atd hol" title="วันหยุด: ${esc(x.x)}"><label><input type="checkbox" data-ad="${x.d}" ${S.attD.includes(x.d)?'checked':''} aria-label="เลือกวันที่ ${dShort(x.d)}"><br><s><b>${dShort(x.d)}</b></s></label><div class="small" style="max-width:70px;white-space:normal;line-height:1.15">${esc(x.x)}</div></th>`:`<th class="atd"><label><input type="checkbox" data-ad="${x.d}" ${S.attD.includes(x.d)?'checked':''} aria-label="เลือกวันที่ ${dShort(x.d)}"><br><b>${dShort(x.d)}</b></label><div class="small muted">${x.h} ชม.</div></th>`).join('');
  const rows=R.map(r=>{const m=A.m[r.s.id]||{},ab=attAbs(c.code,T,r.s.id)||0;
-  return `<tr><td class="num"><label><input type="checkbox" data-as="${r.s.id}" ${S.attS.includes(r.s.id)?'checked':''} aria-label="เลือก ${esc(r.s.name)}"> ${r.s.no}</label></td><td>${esc(r.s.name)}</td>${days.map(x=>{const st=m[x.d]||'';return `<td class="ac"><button class="astb as${st||'0'}" data-ac="${r.s.id}|${x.d}" title="${ATN[st]}" aria-label="${esc(r.s.name)} ${dShort(x.d)} ${ATN[st]}">${st||'/'}</button></td>`;}).join('')}<td class="num">${ab}</td><td class="num">${r.pct==null?'-':`<span class="pill ${r.ms?'p-bad':'p-good'}">${f1(r.pct)}%</span>`}</td></tr>`;}).join('');
+  return `<tr><td class="num"><label><input type="checkbox" data-as="${r.s.id}" ${S.attS.includes(r.s.id)?'checked':''} aria-label="เลือก ${esc(r.s.name)}"> ${r.s.no}</label></td><td>${esc(r.s.name)}</td>${vd.map(x=>{if(x.x)return `<td class="ac hol" title="${esc(x.x)}">—</td>`;const st=m[x.d]||'';return `<td class="ac"><button class="astb as${st||'0'}" data-ac="${r.s.id}|${x.d}" title="${ATN[st]}" aria-label="${esc(r.s.name)} ${dShort(x.d)} ${ATN[st]}">${st||'/'}</button></td>`;}).join('')}<td class="num">${ab}</td><td class="num">${r.pct==null?'-':`<span class="pill ${r.ms?'p-bad':'p-good'}">${f1(r.pct)}%</span>`}</td></tr>`;}).join('');
  return `<div class="stack"><div class="row">${subjectSelect(codes,1)}</div>
+ ${genCard(c,A)}
  <div class="card stack"><h3>เช็คชื่อรายวัน</h3>
   <div class="small muted">เพิ่มวันเรียนทีละวันหรือทั้งช่วง ทุกคนถือว่า “มาเรียน” อยู่แล้ว จึงบันทึกเฉพาะคนที่ขาด/ลา/ป่วย/สาย/หนีเรียน ระบบนับชั่วโมงที่ขาดเข้าเวลาเรียนและตัดเป็น มส. (ต่ำกว่าร้อยละ 80) ให้เอง และพิมพ์รวมเป็นหน้าแนวนอนใน ปพ.5</div>
   <div class="row"><label for="attd">วันที่</label><input id="attd" type="date" value="${S.attLast||''}"><label for="atth">ชั่วโมง/วัน</label><input id="atth" type="number" min="1" max="8" value="${S.attH||1}" style="width:70px"><button class="btn sm" data-at="add">เพิ่มวันเรียน</button></div>
   <details><summary class="small">เพิ่มทั้งช่วงวัน (ข้ามเสาร์-อาทิตย์ให้)</summary><div class="row" style="margin-top:8px"><label for="attf">ตั้งแต่</label><input id="attf" type="date"><label for="attt">ถึง</label><input id="attt" type="date"><label class="small"><input type="checkbox" id="attwe"> รวมเสาร์-อาทิตย์</label><button class="btn sm alt" data-at="range">เพิ่มทั้งช่วง</button></div><div class="small muted">วันหยุดที่ไม่ได้สอน ให้ติ๊กหัวคอลัมน์วันนั้นแล้วกด “ลบวันที่เลือก”</div></details>
   <div class="row"><label for="hrs">ชั่วโมงเรียนทั้งหมดของภาคเรียนนี้</label><input id="hrs" type="number" min="1" value="${H}" style="width:90px"><span class="small muted">ตั้งตามจริงของวิชานี้ (ค่าเริ่มต้น 40) ใช้คิดร้อยละเวลาเรียนและ มส.</span></div>
-  <div class="row"><span class="pill ${days.length?'p-good':'p-warn'}">บันทึกแล้ว ${days.length} วัน · ${totH} ชม. (ตั้งไว้ทั้งภาคเรียน ${H} ชม.)</span>${days.length&&totH>H?`<span class="small" style="color:var(--bad)">ชั่วโมงที่บันทึกมากกว่าที่ตั้งไว้ ปรับช่อง “ชั่วโมงเรียนทั้งหมด” ด้านบน</span>`:''}</div>
+  <div class="row"><span class="pill ${days.length?'p-good':'p-warn'}">บันทึกแล้ว ${days.length-nHol} วัน · ${totH} ชม.${nHol?` (วันหยุดที่ขีดไว้ ${nHol} วัน ไม่นับ)`:''} (ตั้งไว้ทั้งภาคเรียน ${H} ชม.)</span>${days.length&&totH>H?`<span class="small" style="color:var(--bad)">ชั่วโมงที่บันทึกมากกว่าที่ตั้งไว้ ปรับช่อง “ชั่วโมงเรียนทั้งหมด” ด้านบน</span>`:''}</div>
  </div>
  ${days.length?`<div class="card stack"><div class="row"><b>ลงสถานะ</b><select id="atss" aria-label="สถานะ">${ATC.map(k=>`<option value="${k}">${k?k+' = ':''}${ATN[k]}</option>`).join('')}</select><button class="btn sm" data-at="apply">ใช้กับที่เลือก</button><span class="small muted">ติ๊กหน้าชื่อ (หลายคนได้) และ/หรือหัวคอลัมน์วันที่ แล้วกดใช้ — ถ้าเลือกเฉพาะนักเรียน = ทุกวันของคนนั้น, เลือกเฉพาะวัน = ทุกคนในวันนั้น</span></div>
   <div class="row"><button class="btn sm alt" data-at="selall">เลือกนักเรียนทั้งหมด</button><button class="btn sm alt" data-at="selnone">ล้างที่เลือก</button><button class="btn sm alt" data-at="allpresent">ทุกคนมาเรียนทุกวัน</button><button class="btn sm alt" style="color:var(--bad)" data-at="delday">ลบวันที่เลือก</button></div>
+  <div class="row"><b>วันหยุด</b><input id="attholn" placeholder="ชื่อวันหยุด เช่น หยุดชดเชย" size="22"><button class="btn sm alt" data-at="markhol">ตั้งวันที่เลือกเป็นวันหยุด (ขีดช่อง)</button><button class="btn sm alt" data-at="unhol">ยกเลิกวันหยุด</button><span class="small muted">ติ๊กหัวคอลัมน์วันที่ก่อน · วันหยุดไม่นับชั่วโมงและไม่เช็คชื่อ</span></div>
   <div class="small muted">แตะช่องเพื่อเปลี่ยนทีละคน: / (มา) → ข → ล → ป → ส → น · ข=ขาด ล=ลากิจ ป=ลาป่วย ส=สาย (นับว่ามาเรียน) น=หนีเรียน</div></div>
- <div class="tw"><table class="attm"><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th>${head}<th>ขาด (ชม.)</th><th>เวลาเรียน</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="card empty">ยังไม่มีวันเรียน เพิ่มวันที่ด้านบนเพื่อเริ่มเช็คชื่อ</div>'}</div>`;};
+ ${wkBar}
+ <div class="tw hd"><table class="attm"><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th>${head}<th>ขาด (ชม.)</th><th>เวลาเรียน</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="card empty">ยังไม่มีวันเรียน เพิ่มวันที่ด้านบนเพื่อเริ่มเช็คชื่อ</div>'}</div>`;};
 P.scores=()=>{
  const codes=pickSubject();
  if(!codes)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
@@ -139,6 +262,8 @@ P.scores=()=>{
   return `<tr><td>${r.s.no}</td><td>${esc(r.s.name)}</td>${ins}<td class="num">${f1(r.mid)}</td>${fin}${att}${(!pri||t2)?`<td><input type="checkbox" data-rs="${r.s.id}" ${((S.rs[SKEY()]||{})[r.s.id])?'checked':''} aria-label="ร รอการตัดสิน ${esc(r.s.name)}"></td>`:''}${tail}</tr>`;}).join('');
  const head=!pri?'<th>รวม</th><th>เกรด</th>':!t2?'<th>ภาคเรียน 1 (/50)</th><th></th>':'<th>ภาคเรียน 1 (/50)</th><th>ภาคเรียน 2 (/50)</th><th>รวมทั้งปี</th><th>เกรด</th>';
  return `<div class="stack"><div class="row">${subjectSelect(codes)}</div>
+ ${stepBar(c,R,'scores:')}
+ ${subCard(c,R)}
  ${(!pri||t2)&&evMiss(c.code,S.term,R)?`<div class="card lock small row" style="justify-content:space-between"><span>ยังประเมินผู้เรียนไม่ครบ ${evMiss(c.code,S.term,R)} คน เล่ม ปพ.5 จะลงนามและดาวน์โหลดไม่ได้จนกว่าจะประเมินครบ</span><button class="btn sm" data-go="eval">ไปประเมิน</button></div>`:''}
  <div class="card stack"><h3>ตั้งค่าการเก็บคะแนนของวิชานี้</h3>
   ${pri?`<div class="row"><label for="scl">การเก็บคะแนนต่อภาคเรียน</label><select id="scl"><option value="100" ${cfg.scale===100?'selected':''}>เก็บเต็ม 100 (ระบบย่อเหลือ 50)</option><option value="50" ${cfg.scale===50?'selected':''}>เก็บเต็ม 50 ต่อภาคเรียนเลย</option></select></div>`:''}
@@ -147,7 +272,7 @@ P.scores=()=>{
   ${cfg.cols.map((k,i)=>`<div class="row"><input data-cn="${i}" value="${esc(k.n)}" aria-label="ชื่อคะแนนช่องที่ ${i+1}" placeholder="ชื่อคะแนน เช่น ชิ้นงาน" size="16"><input data-cu="${i}" value="${esc(k.u||'')}" aria-label="หน่วยการเรียนรู้ของช่องที่ ${i+1}" placeholder="หน่วยที่ (ถ้ามี)" size="12"><label class="small muted" for="cm${i}">เต็ม</label><input id="cm${i}" type="number" min="1" data-cm="${i}" value="${k.max}" ${cfg.cols.length===1?'disabled':''} style="width:80px">${cfg.cols.length>1?`<button class="btn sm alt" data-act="delcol" data-i="${i}">ลบช่อง</button>`:''}</div>`).join('')}
   <div class="row"><button class="btn sm alt" data-act="addcol">เพิ่มช่องคะแนนเก็บ</button><span class="pill ${ok?'p-good':'p-warn'}">${ok?'รวมคะแนนเก็บครบ '+F.mid:'รวมช่องคะแนน '+sumMax+' ต้องเท่ากับ '+F.mid}</span></div></div>
  <div class="small muted">${pri?'ประถมตัดเกรดเมื่อจบภาคเรียนที่ 2 (เวลาเรียนนับรวมทั้งปี)':'มัธยมตัดเกรดทุกภาคเรียน'} · กรอกเฉพาะชั่วโมงที่ขาด (ไม่กรอก = มาเรียนครบ)</div>
- <div class="tw"><table><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th>${cfg.cols.map(k=>`<th>${esc(k.n)} /${k.max}</th>`).join('')}<th>รวมระหว่างภาค</th><th>ปลายภาค /${F.fin}</th><th>ชั่วโมงที่ขาด (ชม.)</th><th>เวลาเรียน %</th>${(!pri||t2)?'<th>ร</th>':''}${head}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+ <div class="tw hd"><table><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th>${cfg.cols.map(k=>`<th>${esc(k.n)} /${k.max}</th>`).join('')}<th>รวมระหว่างภาค</th><th>ปลายภาค /${F.fin}</th><th>ชั่วโมงที่ขาด (ชม.)</th><th>เวลาเรียน %</th>${(!pri||t2)?'<th>ร</th>':''}${head}</tr></thead><tbody>${rows}</tbody></table></div>${(!pri||t2)?nextBtn(c,R,'scores:'):''}</div>`;
 };
 const ACTS=['ชุมนุม','แนะแนว','ลูกเสือ-เนตรนารี','กิจกรรมเพื่อสังคมและสาธารณประโยชน์'];
 P.acts=()=>{
@@ -254,7 +379,7 @@ P.p5=()=>{
  const struct=(t2?structF(1,cfg1,F1,G1):'')+structF(S.term,cfg,F,G);
  /* เวลาเรียนรายวัน (แนวนอน) */
  const attF=T=>{const A=S.att[c.code+'|'+T];if(!A||!A.days||!A.days.length)return '';
-  const RT=T===S.term?R:calc(c.code,T),HT=cfgOf(c.code,T).hours,days=[...A.days].sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0),PER=20,RPP=20,dch=[],sch=[];
+  const RT=T===S.term?R:calc(c.code,T),HT=cfgOf(c.code,T).hours,days=[...A.days].filter(x=>!x.x).sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0),PER=20,RPP=20,dch=[],sch=[];
   for(let i=0;i<days.length;i+=PER)dch.push(days.slice(i,i+PER));
   for(let i=0;i<RT.length;i+=RPP)sch.push(RT.slice(i,i+RPP));
   const stOf=(sid,d)=>((A.m||{})[sid]||{})[d]||'',blank=n=>'<td></td>'.repeat(n),blankH=n=>'<th></th>'.repeat(n);
@@ -392,7 +517,7 @@ P.school=()=>{const sc=S.school,o=sc.officers;
  return `<div class="stack"><div class="card stack"><h3>ข้อมูลโรงเรียน</h3><label for="scn">ชื่อโรงเรียน</label><input id="scn" data-sc2="name" value="${esc(sc.name)}"><label for="sca">สังกัด</label><input id="sca" data-sc2="area" value="${esc(sc.area)}"></div>
  <div class="card stack"><h3>ผู้ลงนามในสมุด ปพ.5</h3><div class="small muted">ชื่อที่กรอกจะขึ้นในช่องลงนามทุกเล่ม ลายเซ็นจะแสดงเมื่อผู้นั้นลงนามเล่มนั้น</div>
  ${[['measure','หัวหน้างานวัดและประเมินผล'],['acad','หัวหน้ากลุ่มบริหารงานวิชาการ'],['dir','ผู้อำนวยการโรงเรียน']].map(([k,t])=>`<label for="of${k}">${t}</label><input id="of${k}" data-of="${k}" value="${esc(o[k].name)}" placeholder="คำนำหน้า ชื่อ-สกุล">${sigWidget('o:'+k,'ลายเซ็น'+t)}`).join('')}</div>
- ${homeroomCard()}<div class="card stack"><h3>หัวหน้ากลุ่มสาระการเรียนรู้</h3>${Object.entries(AREA).map(([k,t])=>`<details><summary>${t} <span class="small muted">${esc((sc.heads[k]||{}).name||'ยังไม่ตั้งชื่อ')}</span></summary><div class="stack" style="padding:8px 0"><label for="hd${k}">ชื่อหัวหน้ากลุ่มสาระ${t}</label><input id="hd${k}" data-hd="${k}" value="${esc((sc.heads[k]||{}).name||'')}">${sigWidget('h:'+k,'ลายเซ็น')}</div></details>`).join('')}</div></div>`;};
+ ${calCard()}${homeroomCard()}<div class="card stack"><h3>หัวหน้ากลุ่มสาระการเรียนรู้</h3>${Object.entries(AREA).map(([k,t])=>`<details><summary>${t} <span class="small muted">${esc((sc.heads[k]||{}).name||'ยังไม่ตั้งชื่อ')}</span></summary><div class="stack" style="padding:8px 0"><label for="hd${k}">ชื่อหัวหน้ากลุ่มสาระ${t}</label><input id="hd${k}" data-hd="${k}" value="${esc((sc.heads[k]||{}).name||'')}">${sigWidget('h:'+k,'ลายเซ็น')}</div></details>`).join('')}</div></div>`;};
 P.eval=()=>{const codes=pickSubject();
  if(!codes)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติ<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
  const c=CAT.find(x=>x.code===S.scCode),pri=isPri(c.level);
@@ -401,18 +526,27 @@ P.eval=()=>{const codes=pickSubject();
  const o={};EVL.forEach(l=>o[l]=0);R.forEach(r=>{const v=evOverall((st[r.s.id]||{})[k],items.length);if(v)o[v]++;});const all=EVL.reduce((p,l)=>p+o[l],0);
  const opts=`<option value="">-</option><option value="3">3 ดีเยี่ยม</option><option value="2">2 ดี</option><option value="1">1 ผ่าน</option><option value="0">0 ไม่ผ่าน</option>`;
  return `<div class="stack"><div class="row">${subjectSelect(codes,1)}</div>
- <div class="row">${EVK.map(x=>`<button class="chip" aria-pressed="${x[0]===k}" data-evk="${x[0]}">${x[2]}</button>`).join('')}</div>
+ ${stepBar(c,R,'eval:'+k)}
  <div class="card stack"><b>${title}</b><div class="small muted">ให้คะแนนแต่ละข้อ 3 = ดีเยี่ยม · 2 = ดี · 1 = ผ่าน · 0 = ไม่ผ่าน ระบบสรุปผลให้ (ค่าเฉลี่ย 2.5 ขึ้นไปดีเยี่ยม · 1.5 ขึ้นไปดี · 1 ขึ้นไปผ่าน)</div>
- <div class="row"><span class="small">ตั้งทั้งห้อง ทุกข้อ:</span><select id="evall" aria-label="ตั้งทั้งห้อง">${opts}</select><button class="btn sm" data-act="evall">ใช้กับทั้งห้อง</button></div>
+ <div class="row"><span class="small">ตั้งทั้งห้อง:</span><select id="evall" aria-label="ตั้งทั้งห้อง">${opts}</select><button class="btn sm" data-act="evall">ทั้งห้อง</button>
+  <span class="small" style="margin-left:10px">ตั้งตามเลขที่:</span><input id="evnos" placeholder="เช่น 1,3,5-8" size="14" aria-label="เลขที่นักเรียน หลายคนคั่นด้วยจุลภาค"><select id="evlv" aria-label="ระดับ">${opts}</select><button class="btn sm" data-act="evnos">ใช้กับเลขที่เหล่านี้</button></div>
  <div class="row">${EVL.map(l=>`<span class="pill ${l==='ไม่ผ่าน'?'p-bad':l==='ผ่าน'?'p-gold':'p-good'}">${l} ${o[l]} คน</span>`).join('')}<span class="small muted">ประเมินแล้ว ${all}/${R.length}</span></div>
- <div class="tw"><table><thead><tr><th>เลขที่</th><th>ชื่อ - สกุล</th><th>ทุกข้อ</th>${items.map((t,i)=>`<th><span class="small">${i+1}. ${t}</span></th>`).join('')}<th>สรุปผล</th></tr></thead><tbody>
- ${R.map(r=>{const a=(st[r.s.id]||{})[k]||[];return `<tr><td>${r.s.no}</td><td>${esc(r.s.name)}</td><td><select data-evrow="${r.s.id}" aria-label="ตั้งทุกข้อ ${esc(r.s.name)}">${opts}</select></td>${items.map((t,i)=>`<td><select data-ev="${r.s.id}|${i}" aria-label="${esc(t)} ${esc(r.s.name)}">${['','3','2','1','0'].map(v=>`<option value="${v}" ${String(a[i]??'')===v?'selected':''}>${v===''?'-':v}</option>`).join('')}</select></td>`).join('')}<td>${evOverall(a,items.length)||'-'}</td></tr>`}).join('')}</tbody></table></div></div></div>`;};
+ <div class="small muted" style="line-height:1.5">${items.map((t,i)=>`<b>${i+1}</b> ${t}`).join(' · ')}</div>
+ ${(()=>{const two=R.length>16&&innerWidth>=1500,half=two?Math.ceil(R.length/2):R.length;
+  const tbl=rs=>`<div class="tw evc ${two?'':'hd'}"><table><thead><tr><th>ที่</th><th>ชื่อ - สกุล</th><th>ทุกข้อ</th>${items.map((t,i)=>`<th title="${esc(t)}">${i+1}</th>`).join('')}<th>สรุป</th></tr></thead><tbody>
+  ${rs.map(r=>{const a=(st[r.s.id]||{})[k]||[];return `<tr><td>${r.s.no}</td><td>${esc(r.s.name)}</td><td><select data-evrow="${r.s.id}" aria-label="ตั้งทุกข้อ ${esc(r.s.name)}">${opts}</select></td>${items.map((t,i)=>`<td><select data-ev="${r.s.id}|${i}" aria-label="${esc(t)} ${esc(r.s.name)}">${['','3','2','1','0'].map(v=>`<option value="${v}" ${String(a[i]??'')===v?'selected':''}>${v===''?'-':v}</option>`).join('')}</select></td>`).join('')}<td>${evOverall(a,items.length)||'-'}</td></tr>`}).join('')}</tbody></table></div>`;
+  return two?`<div style="display:flex;gap:12px;align-items:flex-start">${tbl(R.slice(0,half))}${tbl(R.slice(half))}</div>`:tbl(R);})()}
+ </div>${nextBtn(c,R,'eval:'+k)}${k===EVK[EVK.length-1][0]?subCard(c,R):''}</div>`;};
 reg('click',e=>{const t=e.target.closest('[data-evk],[data-act]');if(!t)return;const d=t.dataset,a=d.act;
  if(d.evk){S.evKind=d.evk;render();return;}
  if(a==='sigclear'){const cv=document.querySelector(`canvas.sigc[data-target="${d.target}"]`);cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv._dirty=false;}
  else if(a==='sigsave'){const cv=document.querySelector(`canvas.sigc[data-target="${d.target}"]`);if(!cv._dirty)return toast('วาดลายเซ็นในกรอบก่อน');setSig(d.target,cv.toDataURL('image/png'));toast('บันทึกลายเซ็นแล้ว');render();}
  else if(a==='sigdel'){setSig(d.target,null);render();}
  else if(a==='descdel'){metaOf(S.scCode).img=null;render();}
+ else if(a==='holadd'){const f=$('#hf').value,e2=$('#ht').value;if(!f)return toast('เลือกวันที่หยุดก่อน');if(e2&&e2<f)return toast('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม');calOf().hol.push({f,t:e2||f,n:($('#hn').value||'').trim()});render();}
+ else if(a==='holstd'){const cal=calOf(),ys=new Set();[1,2].forEach(t=>[cal[t].open,cal[t].close].forEach(v=>{if(v)ys.add(+v.slice(0,4));}));if(!ys.size){const y=(+S.year||2569)-543;ys.add(y);ys.add(y+1);}const FX=[['01-01','วันขึ้นปีใหม่'],['04-06','วันจักรี'],['04-13','วันสงกรานต์'],['04-14','วันสงกรานต์'],['04-15','วันสงกรานต์'],['05-01','วันแรงงาน'],['05-04','วันฉัตรมงคล'],['06-03','วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี'],['07-28','วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว'],['08-12','วันแม่แห่งชาติ'],['10-13','วันนวมินทรมหาราช'],['10-23','วันปิยมหาราช'],['12-05','วันพ่อแห่งชาติ'],['12-10','วันรัฐธรรมนูญ'],['12-31','วันสิ้นปี']];let n=0;const have=new Set(cal.hol.map(h=>h.f));ys.forEach(y=>FX.forEach(([md,nm])=>{const d=y+'-'+md;if(!have.has(d)){cal.hol.push({f:d,t:d,n:nm});have.add(d);n++;}}));render();toast('เพิ่มวันหยุดแล้ว '+n+' รายการ (ปี '+[...ys].map(y=>y+543).join(', ')+')');}
+ else if(a==='holdel'){calOf().hol.splice(+d.i,1);render();}
+ else if(a==='evnos'){const v=$('#evlv').value,txt=($('#evnos').value||'').trim();if(v==='')return toast('เลือกระดับก่อน');if(!txt)return toast('พิมพ์เลขที่ เช่น 1,3,5-8');const nos=new Set();txt.split(/[,\s]+/).filter(Boolean).forEach(p=>{const m=p.match(/^(\d+)-(\d+)$/);if(m){for(let n=+m[1];n<=+m[2];n++)nos.add(n);}else if(/^\d+$/.test(p))nos.add(+p);});const K=EVK.find(x=>x[0]===S.evKind),st=S.ev[SKEY()]||(S.ev[SKEY()]={});let c=0;const R=calc(S.scCode),have=new Set(R.map(r=>r.s.no));R.forEach(r=>{if(nos.has(r.s.no)){(st[r.s.id]=st[r.s.id]||{})[K[0]]=K[3].map(()=>+v);c++;}});const miss=[...nos].filter(n=>!have.has(n));render();toast('ตั้งผลให้ '+c+' คน'+(miss.length?' · ไม่พบเลขที่ '+miss.join(', '):''));}
  else if(a==='evall'){const v=$('#evall').value;if(v==='')return toast('เลือกระดับก่อน');const K=EVK.find(x=>x[0]===S.evKind),st=S.ev[SKEY()]||(S.ev[SKEY()]={});calc(S.scCode).forEach(r=>{(st[r.s.id]=st[r.s.id]||{})[K[0]]=K[3].map(()=>+v);});render();}
 });
 reg('change',e=>{const t=e.target,d=t.dataset;
@@ -427,6 +561,7 @@ reg('change',e=>{const t=e.target,d=t.dataset;
  else if(d.rs!==undefined){const m=S.rs[SKEY()]||(S.rs[SKEY()]={});m[d.rs]=t.checked;render();}
  else if(d.cu!==undefined){cfgOf(S.scCode).cols[+d.cu].u=t.value;render();}
  else if(d.sc2){S.school[d.sc2]=t.value;}
+ else if(d.cal){const [tt,f]=d.cal.split('.');calOf()[tt][f]=t.value;}
  else if(d.of){S.school.officers[d.of].name=t.value;}
  else if(d.hd){(S.school.heads[d.hd]=S.school.heads[d.hd]||{}).name=t.value;}
  else if(d.ev!==undefined){const [sid,i]=d.ev.split('|'),K=EVK.find(x=>x[0]===S.evKind),st=S.ev[SKEY()]||(S.ev[SKEY()]={}),o=st[sid]||(st[sid]={}),a=o[K[0]]||(o[K[0]]=K[3].map(()=>''));a[+i]=t.value===''?'':+t.value;render();}
@@ -715,10 +850,21 @@ reg('click', (e) => {
     const we = $('#attwe').checked, list = [], d = new Date(f + 'T00:00:00'), end = new Date(e2 + 'T00:00:00')
     while (d <= end && list.length < 370) { if (we || (d.getDay() !== 0 && d.getDay() !== 6)) list.push(isoD(d)); d.setDate(d.getDate() + 1) }
     const n = attAddDays(list, h); S.attH = h; toast(`เพิ่มแล้ว ${n} วัน`); attRender()
+  } else if (a === 'markhol') {
+    if (!S.attD.length) return toast('ติ๊กหัวคอลัมน์วันที่ที่เป็นวันหยุดก่อน')
+    const nm = ($('#attholn').value || '').trim(); if (!nm) return toast('พิมพ์ชื่อวันหยุด เช่น วันหยุดพิเศษ')
+    const sel = new Set(S.attD); A.days.forEach((x) => { if (sel.has(x.d)) { x.x = nm; Object.values(A.m).forEach((m) => delete m[x.d]) } })
+    S.attD = []; toast('ตั้งเป็นวันหยุดแล้ว (ไม่นับชั่วโมง)'); attRender()
+  } else if (a === 'unhol') {
+    if (!S.attD.length) return toast('ติ๊กหัวคอลัมน์วันที่ที่จะยกเลิกวันหยุดก่อน')
+    const sel = new Set(S.attD); A.days.forEach((x) => { if (sel.has(x.d)) delete x.x }); S.attD = []; toast('ยกเลิกวันหยุดแล้ว กลับเป็นวันเรียน'); attRender()
+  } else if (a === 'gen') { attGen($('#genf').value, $('#gent').value)
+  } else if (a === 'wkprev' || a === 'wknext') {
+    const ws = attWeeks(A.days), i = ws.findIndex((w) => w[0] === S.attWk), n = ws[i + (a === 'wkprev' ? -1 : 1)]; if (n) { S.attWk = n[0]; attRender() }
   } else if (a === 'apply') {
     const st = $('#atss').value, ss = S.attS.length ? S.attS : null, dd = S.attD.length ? S.attD : null
     if (!ss && !dd) return toast('ติ๊กนักเรียน หรือหัวคอลัมน์วันที่ ที่ต้องการก่อน')
-    ;(ss || ids).forEach((sid) => { const m = (A.m[sid] = A.m[sid] || {}); (dd || A.days.map((x) => x.d)).forEach((d) => { if (st) m[d] = st; else delete m[d] }) })
+    ;(ss || ids).forEach((sid) => { const m = (A.m[sid] = A.m[sid] || {}); (dd || S.attVis || A.days.map((x) => x.d)).filter((d) => !A.days.some((y) => y.d === d && y.x)).forEach((d) => { if (st) m[d] = st; else delete m[d] }) })
     toast('บันทึกแล้ว'); attRender()
   } else if (a === 'selall') { S.attS = ids.slice(); attRender() }
   else if (a === 'selnone') { S.attS = []; S.attD = []; attRender() }
@@ -736,6 +882,8 @@ reg('change', (e) => {
   const t = e.target, d = t.dataset
   if (!$('#view') || !$('#view').contains(t)) return
   const tog = (k, v) => { const a = (S[k] = S[k] || []), i = a.indexOf(v); if (t.checked) { if (i < 0) a.push(v) } else if (i >= 0) a.splice(i, 1) }
+  if (d.ttd !== undefined) { const A = attOf(S.scCode, S.term); A.tt = A.tt || { h: {} }; A.tt.h[d.ttd] = +t.value; return }
+  if (t.id === 'attwk') { S.attWk = t.value; attRender(); return }
   if (d.as !== undefined) tog('attS', d.as)
   else if (d.ad !== undefined) tog('attD', d.ad)
 })
@@ -761,28 +909,46 @@ reg('change', (e) => {
   else if (t.dataset.av) { const st = S.acts[t.dataset.av]; if (!claim(t.dataset.av)) { render(); return } st.v[t.dataset.s] = t.value }
   else if (t.dataset.cv) { const m = S.members[t.dataset.club]; m.v = m.v || {}; m.v[t.dataset.cv] = t.value }
 })
-// ลูกศร/Enter เลื่อนช่องกรอกคะแนน (ซ้าย-ขวา-ขึ้น-ลง)
+// ลูกศร/Enter เลื่อนช่องกรอก (ซ้าย-ขวา-ขึ้น-ลง) ใช้ได้ทั้งในตารางและแถวช่องกรอก (ตั้งค่าคะแนน ฯลฯ)
+const NAVSEL = 'input:not([type=checkbox]):not([type=file]):not([type=date]):not([type=hidden]):not([type=radio]),select[data-ev],select[data-evrow]'
+const navOk = (x) => x && !x.disabled && x.offsetParent !== null
 reg('keydown', (e) => {
-  const t = e.target
-  if (!t || !t.matches || !t.matches('input[data-sc],input[data-ab]') || !$('#view') || !$('#view').contains(t)) return
+  const t = e.target, v = $('#view')
+  if (!t || !t.matches || !v || !v.contains(t) || !t.matches(NAVSEL)) return
   const k = e.key
   if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(k)) return
-  const td = t.closest('td'), tr = td && td.closest('tr'); if (!tr) return
-  const ok = (x) => x && !x.disabled
-  const cellIn = (row, ci) => { const c = row && row.cells[ci]; const i = c && c.querySelector('input[data-sc],input[data-ab]'); return ok(i) ? i : null }
+  const isSel = t.tagName === 'SELECT'
+  if (isSel && k === 'Enter') return
+  if (!isSel && t.selectionStart != null && t.type !== 'number') { // ช่องข้อความ: ลูกศรซ้าย/ขวาเลื่อนกล่องเมื่อเคอร์เซอร์อยู่ขอบ
+    if (k === 'ArrowLeft' && !(t.selectionStart === 0 && t.selectionEnd === 0)) return
+    if (k === 'ArrowRight' && !(t.selectionStart === t.value.length && t.selectionEnd === t.value.length)) return
+  }
+  const fieldsOf = (c) => [...c.querySelectorAll(NAVSEL)].filter(navOk)
   let target = null
-  if (k === 'ArrowLeft' || k === 'ArrowRight') {
-    const d = k === 'ArrowLeft' ? -1 : 1
-    for (let ci = td.cellIndex + d; ci >= 0 && ci < tr.cells.length; ci += d) { const i = cellIn(tr, ci); if (i) { target = i; break } }
+  const td = t.closest('td'), tr = td && td.closest('tr')
+  if (tr) {
+    const cellIn = (row, ci) => { const c = row && row.cells[ci]; const i = c && c.querySelector(NAVSEL); return navOk(i) ? i : null }
+    if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      const d = k === 'ArrowLeft' ? -1 : 1
+      for (let ci = td.cellIndex + d; ci >= 0 && ci < tr.cells.length; ci += d) { const i = cellIn(tr, ci); if (i) { target = i; break } }
+    } else {
+      const d = k === 'ArrowUp' ? -1 : 1
+      for (let r = tr.sectionRowIndex + d, rows = tr.parentNode.rows; r >= 0 && r < rows.length; r += d) { const i = cellIn(rows[r], td.cellIndex); if (i) { target = i; break } }
+    }
   } else {
-    const d = k === 'ArrowUp' ? -1 : 1
-    for (let r = tr.sectionRowIndex + d, rows = tr.parentNode.rows; r >= 0 && r < rows.length; r += d) { const i = cellIn(rows[r], td.cellIndex); if (i) { target = i; break } }
+    const row = t.closest('.row'); if (!row) return
+    const fs = fieldsOf(row), idx = fs.indexOf(t)
+    if (k === 'ArrowLeft' || k === 'ArrowRight') target = fs[idx + (k === 'ArrowLeft' ? -1 : 1)] || null
+    else {
+      const d = k === 'ArrowUp' ? 'previousElementSibling' : 'nextElementSibling'
+      for (let r = row[d]; r; r = r[d]) { if (!r.classList.contains('row')) continue; const f = fieldsOf(r)[idx]; if (f) { target = f; break } }
+    }
   }
   e.preventDefault()
   if (!target) return
-  const sel = target.dataset.sc ? `input[data-sc="${target.dataset.sc}"][data-i="${target.dataset.i}"]` : `input[data-ab="${target.dataset.ab}"]`
+  const ti = [...v.querySelectorAll(NAVSEL)].indexOf(target)
   target.focus() // blur ของช่องเดิมจะบันทึกค่าและ render ใหม่
-  const f = $('#view').querySelector(sel); if (f) { f.focus(); try { f.select() } catch (_) {} }
+  const f = [...$('#view').querySelectorAll(NAVSEL)][ti]; if (f) { f.focus(); try { f.select() } catch (_) {} }
 })
 function claim(key) {
   const st = S.acts[key]; if (isAdmin()) return true
@@ -800,9 +966,11 @@ function stickAll() { stickNames() }
 function render() {
   const v = $('#view'); if (!v) return
   if (!ready()) { v.innerHTML = '<div class="card empty">กำลังโหลดข้อมูล…</div>'; return }
+  const ae = document.activeElement, aeSel = ae && ae.tagName === 'SELECT' && ae.matches('[data-ev],[data-evrow]') && v.contains(ae) ? [...v.querySelectorAll('select[data-ev],select[data-evrow]')].indexOf(ae) : -1
   try { v.innerHTML = (S.tpl ? TPL_BAR : '') + P[S.page]() } catch (err) { console.error(err); v.innerHTML = `<div class="card lock">แสดงหน้านี้ไม่ได้: ${esc(err.message)}</div>`; return }
   if (S.tpl) v.querySelectorAll('input,select,textarea').forEach((el) => { if (!el.matches('#sub,#rpst,#allsubj')) el.disabled = true })
   stickNames(); initSig(); persist()
+  if (aeSel >= 0) { const f = v.querySelectorAll('select[data-ev],select[data-evrow]')[aeSel]; if (f) f.focus() }
 }
 function softRender() {
   const a = document.activeElement
@@ -819,7 +987,7 @@ const tplGate = (e) => {
   const t = e.target
   if (e.type === 'click') {
     const b = t.closest('button,[data-act],[data-rl],[data-go],[data-term]'); if (!b) return
-    if (b.matches('[data-gk],[data-go],[data-term],[data-sumlv],[data-actlv],[data-clublv],[data-rl],[data-evk],[data-act=dl],[data-act=rdl],[data-act=sumdl]')) return
+    if (b.matches('[data-nx],[data-pgf],[data-gk],[data-go],[data-term],[data-sumlv],[data-actlv],[data-clublv],[data-rl],[data-evk],[data-act=dl],[data-act=rdl],[data-act=sumdl]')) return
     e.stopImmediatePropagation(); e.preventDefault(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้')
   } else if (!t.matches('#sub,#rpst,#allsubj')) { e.stopImmediatePropagation(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้') }
 }
@@ -835,7 +1003,7 @@ const docId = (b, sub) => `${S.year}~${b}~${encodeURIComponent(sub).replace(/\./
 function cleaned(b, d) {
   if (b === 'cfg' && d.cols && d.cols.length === 1 && d.cols[0].n === 'คะแนนเก็บระหว่างภาค' && d.scale === 100 && d.hours === 40 && !d.ratio) return {}
   if (b === 'scores') { const o = {}; for (const [k, v] of Object.entries(d)) if ((v.c || []).some((x) => x !== '' && x != null) || (v.f !== '' && v.f != null)) o[k] = v; return o }
-  if (b === 'att') { if (!d.days || !d.days.length) return {}; const m = {}; for (const [k, v] of Object.entries(d.m || {})) { const o = Object.fromEntries(Object.entries(v).filter(([, x]) => x)); if (Object.keys(o).length) m[k] = o } return { days: d.days, m } }
+  if (b === 'att') { const tt = d.tt && Object.keys(d.tt.h || {}).length ? { tt: d.tt } : {}; if (!d.days || !d.days.length) return tt; const m = {}; for (const [k, v] of Object.entries(d.m || {})) { const o = Object.fromEntries(Object.entries(v).filter(([, x]) => x)); if (Object.keys(o).length) m[k] = o } return { days: d.days, m, ...tt } }
   if (b === 'ab') { const o = {}; for (const [k, v] of Object.entries(d)) if (Object.values(v).some((x) => +x > 0)) o[k] = v; return o }
   return d
 }
