@@ -343,3 +343,12 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .tw.evc th:nth-child(2),.tw.evc td:nth-child(2){max-width:190px;overflow:hidden;text-overflow:ellipsis}
 .attm th.hol,.attm td.hol{background:repeating-linear-gradient(135deg,#f3e9e4,#f3e9e4 6px,#e9dcd5 6px,#e9dcd5 12px);color:#8a7a76;text-align:center}
 .attm td.hol{font-weight:700}
+
+/* ใบแจ้งผลมัธยม (แบบรายงานประจำตัวนักเรียน) บนหน้าจอ */
+.pg.rps{position:relative}.rpsk{position:absolute;top:10px;left:14px;font-size:.85rem;color:#555}
+.rps .rhd img{width:80px;height:80px}
+.rpsn{display:flex;justify-content:center;gap:24px;flex-wrap:wrap}.rpsn b{margin-right:6px}
+.rs3{min-width:640px}.rs3 td.b{font-weight:700}.rs3 td.nt{font-size:.8rem;color:#555}
+.rpsb{display:grid;grid-template-columns:minmax(0,58%) 1fr;gap:16px;align-items:start}
+.rsum{min-width:0}.rpss{display:grid;gap:10px}
+@media (max-width:640px){.rpsb{grid-template-columns:1fr}}

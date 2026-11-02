@@ -574,7 +574,51 @@ function rptData(L,T){T=T||S.term;const pri=isPri(L);
  const cal=subs.map(c=>({c,R:calc(c.code,T)}));const stus=ACT().filter(s=>s.level===L);
  return {cal,stus,T,pri,mode:pri?(T===1?'p1':'p2'):'s'};}
 const rname=(L,s,T)=>`ใบแจ้งผลการเรียน_${L}_ภาคเรียน${T||S.term}_ปีการศึกษา${S.year}_${s?s.name.replace(/\s+/g,'_'):'ทั้งห้อง'}.pdf`.replace(/[\\/:*?"<>|]/g,'');
-function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rpt[L]||{},T=D.T,M=D.mode;
+// ใบแจ้งผลมัธยม: "แบบรายงานประจำตัวนักเรียน" หน้าเดียว A4 (หน่วยกิต สอบปกติ/แก้ตัว คุณลักษณะ อ่านคิดวิเคราะห์เขียน สรุปหน่วยกิต/GPA)
+const EVN=lab=>lab?3-EVL.indexOf(lab):null;
+const evLabOf=m=>m==null?'-':EVL[3-(m>=2.5?3:m>=1.5?2:m>=1?1:0)];
+const credOf=(code,T)=>(+cfgOf(code,T).hours||40)/40;
+const fmtCr=x=>(Math.round(x*10)/10).toFixed(1);
+function rptPageS(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rpt[L]||{},T=D.T,showSc=st.sc!==false;
+ const rows=D.cal.map(x=>{const c=x.c,r=x.R.find(q=>q.s.id===s.id)||{},k=c.code+'|'+T,fx=((S.fix[k]||{})[s.id])||{},ev=((S.ev[k]||{})[s.id])||{};
+  const after=String(fx.after||'').trim(),afN=after!==''&&!isNaN(+after)?+after:null;
+  const eff=afN!=null?afN:(typeof r.g==='number'?r.g:null);
+  return {c,r,add:c.code[3]==='2',cr:credOf(c.code,T),after,eff,ea:EVN(evOverall(ev.a,EVK[0][3].length)),er:EVN(evOverall(ev.r,EVK[1][3].length))};});
+ const crS=l=>l.reduce((a,x)=>a+x.cr,0),crG=l=>l.reduce((a,x)=>a+(x.eff!=null&&x.eff>=1?x.cr:0),0);
+ const base=rows.filter(x=>!x.add),add=rows.filter(x=>x.add);
+ const gr=rows.filter(x=>x.eff!=null),gpa=gr.length?gr.reduce((a,x)=>a+x.eff*x.cr,0)/crS(gr):null;
+ const avg=a=>{a=a.filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null;};
+ const evA=evLabOf(avg(rows.map(x=>x.ea))),evR=evLabOf(avg(rows.map(x=>x.er)));
+ const clubE=Object.entries(S.members).find(([,m])=>(m.ids||[]).includes(s.id));
+ const acts=ACTS.map(a=>{if(a==='ชุมนุม')return {n:clubE?`ชุมนุม (${clubE[0]})`:'ชุมนุม',v:clubE?((clubE[1].v||{})[s.id]||'-'):'-'};return {n:a,v:((S.acts[L+'|'+a]||{}).v||{})[s.id]||'-'};});
+ const actAll=acts.some(a=>a.v==='มผ')?'มผ':acts.every(a=>a.v==='ผ')?'ผ':'-';
+ const gTxt=g=>g==null?'-':g;
+ const note=x=>x.r.g==='มส'?'เวลาเรียนไม่ถึง 80%':x.r.g==='ร'?'รอการตัดสิน':'';
+ const nC=showSc?10:9;
+ const line=x=>`<tr><td class="num">${x.c.code}</td><td>${esc(x.c.name)}</td><td class="num">${x.add?'เพิ่มเติม':'พื้นฐาน'}</td><td class="num">${fmtCr(x.cr)}</td>${showSc?`<td class="num">${x.r.tot==null?'-':f1(x.r.tot)}</td>`:''}<td class="num b">${gTxt(x.r.g)}</td><td class="num b">${esc(x.after)}</td><td class="num">${x.ea==null?'-':x.ea}</td><td class="num">${x.er==null?'-':x.er}</td><td class="nt">${note(x)}</td></tr>`;
+ const aLine=a=>`<tr><td></td><td>${esc(a.n)}</td><td class="num">กิจกรรม</td><td></td>${showSc?'<td class="num">-</td>':''}<td class="num b">${a.v}</td><td></td><td></td><td></td><td></td></tr>`;
+ const n=rows.length+acts.length,fs=n<=18?13.5:n<=22?12.5:n<=26?11.5:10.5;
+ const sigT=st.t?S.sigs[hr[0]]:null,sigD=st.dir?sc.officers.dir.sig:null;
+ const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'..............................................'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
+ const lvTxt='มัธยมศึกษาปีที่ '+L.replace('ม.','');
+ return `<div class="pg rp rps" style="--rfs:${fs}pt"><div class="rpsk">ปพ.6</div>
+ <div class="rhd"><img src="${LOGO}" alt=""><b>แบบรายงานประจำตัวนักเรียน</b><span>${esc(sc.name)} &nbsp; ${esc(sc.area)}</span><span>ชั้น${lvTxt} &nbsp; ภาคเรียนที่ ${T} &nbsp; ปีการศึกษา ${yr}</span></div>
+ <div class="rpsn"><span><b>ชื่อ</b> ${esc(s.name)}</span><span><b>เลขประจำตัว</b> ${s.sid?esc(s.sid):'..........'}</span><span><b>ชั้น</b> ${L}</span><span><b>เลขที่</b> ${s.no}</span></div>
+ <div class="tw"><table class="rs3"><colgroup><col style="width:10%"><col><col style="width:8%"><col style="width:7%">${showSc?'<col style="width:6%">':''}<col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:9%"><col style="width:8%"></colgroup>
+ <thead><tr><th rowspan="2">รหัสวิชา</th><th rowspan="2">รายวิชา</th><th rowspan="2">ประเภท</th><th rowspan="2">หน่วยกิต</th><th colspan="${showSc?3:2}">การประเมินผลสัมฤทธิ์</th><th rowspan="2">คุณ<br>ลักษณะ</th><th rowspan="2">อ่าน คิด<br>วิเคราะห์ เขียน</th><th rowspan="2">หมายเหตุ</th></tr>
+ <tr>${showSc?'<th>คะแนน</th>':''}<th>สอบปกติ</th><th>แก้ตัว</th></tr></thead>
+ <tbody>${base.map(line).join('')}${add.map(line).join('')}${acts.map(aLine).join('')}${rows.length?'':`<tr><td colspan="${nC}" class="num">ยังไม่มีรายวิชา</td></tr>`}</tbody></table></div>
+ <div class="rpsb"><div class="tw"><table class="rs3 rsum"><thead><tr><th rowspan="2">สรุปผลการประเมิน</th><th colspan="2">ผลการเรียน</th></tr><tr><th>ที่เรียน</th><th>ที่ได้</th></tr></thead><tbody>
+ <tr><td>จำนวนหน่วยกิตรายวิชาพื้นฐาน</td><td class="num">${fmtCr(crS(base))}</td><td class="num">${fmtCr(crG(base))}</td></tr>
+ <tr><td>จำนวนหน่วยกิตรายวิชาเพิ่มเติม</td><td class="num">${fmtCr(crS(add))}</td><td class="num">${fmtCr(crG(add))}</td></tr>
+ <tr><td>รวมจำนวนหน่วยกิต</td><td class="num">${fmtCr(crS(rows))}</td><td class="num">${fmtCr(crG(rows))}</td></tr>
+ <tr><td>ระดับผลการเรียนเฉลี่ย (GPA)</td><td class="num b" colspan="2">${gpa==null?'-':gpa.toFixed(2)}</td></tr>
+ <tr><td>ผลการประเมินคุณลักษณะอันพึงประสงค์</td><td class="num" colspan="2">${evA}</td></tr>
+ <tr><td>ผลการประเมินการอ่าน คิดวิเคราะห์ และเขียน</td><td class="num" colspan="2">${evR}</td></tr>
+ <tr><td>ผลการประเมินกิจกรรมพัฒนาผู้เรียน</td><td class="num" colspan="2">${actAll}</td></tr></tbody></table></div>
+ <div class="rpss">${sg(sigT,hr.length?USERS[hr[0]].name:'','ครูที่ปรึกษา')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
+ <div class="small">คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน · หน่วยกิตคิดจากเวลาเรียน 40 ชั่วโมง = 1.0 หน่วยกิต</div></div>`;}
+function rptPage(L,s,D){if(D.mode==='s')return rptPageS(L,s,D);const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rpt[L]||{},T=D.T,M=D.mode;
  const rows=D.cal.map(x=>{const r=x.R.find(q=>q.s.id===s.id);return {c:x.c,add:x.c.code[3]==='2',r};});
  const pctOf=r=>M==='p1'?(r.cur==null?null:r.cur/50*100):M==='p2'?r.sum:r.tot;
  const have=rows.filter(x=>pctOf(x.r)!=null),mean=have.length?have.reduce((a,x)=>a+pctOf(x.r),0)/have.length:null,ap=rows.filter(x=>x.r.pct!=null),mAtt=ap.length?ap.reduce((a,x)=>a+x.r.pct,0)/ap.length:null;
@@ -616,7 +660,7 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
 
 P.report=()=>{const L=LEVELS.includes(S.rpLevel)?S.rpLevel:'ป.3',D=rptData(L),T=D.T,s=D.stus.find(x=>x.id===S.rpStu)||D.stus[0],st=S.rpt[L]||(S.rpt[L]={});
  const ttl={p1:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 1',p2:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 2 (ผลทั้งปี)',s:`ใบแจ้งผลการเรียน มัธยม ภาคเรียนที่ ${T}`}[D.mode];
- const dsc={p1:'แจ้งคะแนนทุกวิชาของนักเรียน (เต็มวิชาละ 50) พร้อมเวลาเรียน ให้ผู้ปกครองรับทราบ ยังไม่ตัดสินเกรด',p2:'แจ้งผลการเรียนทั้งปี (ภาคเรียนที่ 1 + 2 = 100) ระดับผลการเรียน เวลาเรียนรวมทั้งปี และผลกิจกรรมพัฒนาผู้เรียน',s:'แจ้งคะแนน ระดับผลการเรียน เวลาเรียน และผลกิจกรรมพัฒนาผู้เรียนของภาคเรียนนี้'}[D.mode];
+ const dsc={p1:'แจ้งคะแนนทุกวิชาของนักเรียน (เต็มวิชาละ 50) พร้อมเวลาเรียน ให้ผู้ปกครองรับทราบ ยังไม่ตัดสินเกรด',p2:'แจ้งผลการเรียนทั้งปี (ภาคเรียนที่ 1 + 2 = 100) ระดับผลการเรียน เวลาเรียนรวมทั้งปี และผลกิจกรรมพัฒนาผู้เรียน',s:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4: หน่วยกิต ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรมพัฒนาผู้เรียน สรุปหน่วยกิตและ GPA (ติ๊กเลือกได้ว่าจะแสดงคะแนนรวมหรือไม่)'}[D.mode];
  return `<div class="stack"><div class="row">${LEVELS.map(l=>`<button class="chip" aria-pressed="${l===L}" data-rl="${l}">${l}</button>`).join('')}</div>
  <div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${S.term===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>
  <div class="card stack"><h3>${ttl}</h3><div class="small muted">${dsc}</div>
@@ -624,7 +668,7 @@ P.report=()=>{const L=LEVELS.includes(S.rpLevel)?S.rpLevel:'ป.3',D=rptData(L),
  <code style="word-break:break-all">${esc(rname(L,s,T))}</code>
  <div class="row"><button class="btn sm" data-act="rdl" data-w="one">PDF รายบุคคล</button><button class="btn sm alt" data-act="rdl" data-w="all">PDF ทั้งห้อง (${D.stus.length} คน คนละหน้า)</button></div>
  <code style="word-break:break-all">${esc(rname(L,null,T))}</code>
- <div class="row"><label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${isAdmin()?`<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
+ <div class="row">${D.mode==='s'?`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`:''}<label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${isAdmin()?`<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
  ${D.cal.length?'':'<div class="card empty">ชั้นนี้ยังไม่มีรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}
  ${D.stus.length&&D.cal.length?rptPage(L,s,D):''}</div>`;};
 const PRI_L=['ป.1','ป.2','ป.3','ป.4','ป.5','ป.6'];
@@ -968,7 +1012,7 @@ function render() {
   if (!ready()) { v.innerHTML = '<div class="card empty">กำลังโหลดข้อมูล…</div>'; return }
   const ae = document.activeElement, aeSel = ae && ae.tagName === 'SELECT' && ae.matches('[data-ev],[data-evrow]') && v.contains(ae) ? [...v.querySelectorAll('select[data-ev],select[data-evrow]')].indexOf(ae) : -1
   try { v.innerHTML = (S.tpl ? TPL_BAR : '') + P[S.page]() } catch (err) { console.error(err); v.innerHTML = `<div class="card lock">แสดงหน้านี้ไม่ได้: ${esc(err.message)}</div>`; return }
-  if (S.tpl) v.querySelectorAll('input,select,textarea').forEach((el) => { if (!el.matches('#sub,#rpst,#allsubj')) el.disabled = true })
+  if (S.tpl) v.querySelectorAll('input,select,textarea').forEach((el) => { if (!el.matches('#sub,#rpst,#allsubj,#rpsc')) el.disabled = true })
   stickNames(); initSig(); persist()
   if (aeSel >= 0) { const f = v.querySelectorAll('select[data-ev],select[data-evrow]')[aeSel]; if (f) f.focus() }
 }
@@ -989,7 +1033,7 @@ const tplGate = (e) => {
     const b = t.closest('button,[data-act],[data-rl],[data-go],[data-term]'); if (!b) return
     if (b.matches('[data-nx],[data-pgf],[data-gk],[data-go],[data-term],[data-sumlv],[data-actlv],[data-clublv],[data-rl],[data-evk],[data-act=dl],[data-act=rdl],[data-act=sumdl]')) return
     e.stopImmediatePropagation(); e.preventDefault(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้')
-  } else if (!t.matches('#sub,#rpst,#allsubj')) { e.stopImmediatePropagation(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้') }
+  } else if (!t.matches('#sub,#rpst,#allsubj,#rpsc')) { e.stopImmediatePropagation(); toast('ยังไม่กำหนดปีการศึกษา กรอกหรือแก้ไขข้อมูลไม่ได้') }
 }
 const tplBlank = () => LEVELS.flatMap((L) => Array.from({ length: 40 }, (_, i) => ({ id: '_' + L + '_' + (i + 1), name: '', level: L, no: i + 1, status: 'active' })))
 const ready = () => st8.work && st8.settings && S.year && CAT.length
