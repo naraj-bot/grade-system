@@ -65,7 +65,8 @@ function myCodes(){if(S.tpl)return [...new Set(CAT.filter(c=>isPri(c.level)||c.t
   return [...new Set(isAdmin()?CAT.filter(c=>S.openSubj.has(c.code)&&(isPri(c.level)||c.term===S.term)).map(c=>c.code):S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return isPri(x.level)||x.term===S.term;}))];}
 const TK=(code,T)=>{T=T||S.term;const c=CAT.find(x=>x.code===code);return(c&&isPri(c.level)&&T===1)?code+'~1':code;};
 const uk=(T,l)=>(T===1&&isPri(CAT.find(x=>x.code===S.scCode).level))?'①'+l:l;
-function cfgOf(code,T){const k=TK(code,T);const f=S.cfg[k]||(S.cfg[k]={scale:100,cols:[{n:'คะแนนเก็บระหว่างภาค',max:0}]});if(!f.hours)f.hours=40;return f;}
+// ค่าตั้งวิชาที่เป็นค่าเริ่มต้นถูกบันทึกเป็น {} (ดู cleaned) → เติมค่าที่ขาดทุกครั้งที่อ่าน กันหน้าพังเมื่อโหลดจาก Firestore
+function cfgOf(code,T){const k=TK(code,T);const f=S.cfg[k]||(S.cfg[k]={});if(!Array.isArray(f.cols)||!f.cols.length)f.cols=[{n:'คะแนนเก็บระหว่างภาค',max:0}];if(!f.scale)f.scale=100;if(!f.hours)f.hours=40;return f;}
 function fulls(code,T){const c=CAT.find(x=>x.code===code),f=cfgOf(code,T),base=isPri(c.level)?f.scale:100,[r1,r2]=(f.ratio||'70:30').split(':').map(Number);return {base,mid:base*r1/100,fin:base*r2/100};}
 const sumC=v=>{const a=(v&&v.c)||[];return a.length&&a.every(x=>x!==''&&x!=null)?a.reduce((p,q)=>p+(+q),0):null;};
 function calc(code,T){T=T||S.term;const c=CAT.find(x=>x.code===code),pri=isPri(c.level),F=fulls(code,T),cfg=cfgOf(code,T),H=cfg.hours,key=TK(code,T);
@@ -105,14 +106,16 @@ function progOf(code,T){
 }
 const PST={sent:['ส่งผลแล้ว','p-good'],full:['กรอกครบ ยังไม่ส่ง','p-gold'],part:['กำลังกรอก','p-warn'],none:['ยังไม่เริ่ม','p-bad'],noteacher:['ยังไม่มีครูสอน','p-bad']};
 function progMark(code){try{const p=progOf(code,S.term);return p.st==='sent'?'✔ ':p.st==='full'?'● ':p.st==='part'?'◐ ':'○ ';}catch(e){return '';}}
+// วิชาที่ข้อมูลผิดรูปแบบไม่ทำให้ทั้งหน้าพัง: แสดงเป็น "ยังไม่เริ่ม" และบันทึกข้อผิดพลาดไว้ใน console
+function progSafe(code,T){try{return progOf(code,T);}catch(e){console.error('progOf',code,e);return {c:CAT.find(x=>x.code===code),pri:false,n:0,full:0,any:0,att:false,needEv:false,em:0,sub:S.sub[SUBK(code,T)]||null,st:S.sub[SUBK(code,T)]?'sent':'none'};}}
 function progRows(){
   const T=S.term,okc=c=>c&&(isPri(c.level)||c.term===T);
   const regs=S.regs.filter(r=>r.status==='ok'&&(isAdmin()||r.t===S.role));
   const seen=new Set(),out=[];
   regs.forEach(r=>r.codes.forEach(code=>{const c=CAT.find(x=>x.code===code);if(!okc(c)||seen.has(code))return;seen.add(code);
     let tn='-';try{tn=(USERS[r.t]&&USERS[r.t].name)||r.name||'-';}catch(e){}
-    out.push({code,c,teacher:tn,p:progOf(code,T)});}));
-  if(isAdmin())CAT.filter(c=>S.openSubj.has(c.code)&&okc(c)&&!seen.has(c.code)).forEach(c=>out.push({code:c.code,c,teacher:'-',p:{...progOf(c.code,T),st:'noteacher'},nt:true}));
+    out.push({code,c,teacher:tn,p:progSafe(code,T)});}));
+  if(isAdmin())CAT.filter(c=>S.openSubj.has(c.code)&&okc(c)&&!seen.has(c.code)).forEach(c=>out.push({code:c.code,c,teacher:'-',p:{...progSafe(c.code,T),st:'noteacher'},nt:true}));
   return out.sort((a,b)=>a.c.level.localeCompare(b.c.level,'th')||a.code.localeCompare(b.code));
 }
 function submitSubject(code){
@@ -176,7 +179,7 @@ reg('click',e=>{const nx=e.target.closest('[data-nx]');if(nx&&$('#view')&&$('#vi
 /* ---------- เช็คชื่อรายวัน ---------- */
 const ATC=['','ข','ล','ป','ส','น'],ATN={'':'มา',ข:'ขาด',ล:'ลากิจ',ป:'ป่วย',ส:'สาย',น:'หนีเรียน'},ATABS='ขลปน';
 const attKey=(code,T)=>code+'|'+T;
-const attOf=(code,T)=>S.att[attKey(code,T)]||(S.att[attKey(code,T)]={days:[],m:{}});
+const attOf=(code,T)=>{const x=S.att[attKey(code,T)]||(S.att[attKey(code,T)]={});if(!Array.isArray(x.days))x.days=[];if(!x.m||typeof x.m!=='object')x.m={};return x;};
 const attHas=(code,T)=>{const x=S.att[attKey(code,T)];return !!(x&&x.days&&x.days.length);};
 function attAbs(code,T,sid){const x=S.att[attKey(code,T)];if(!x||!x.days||!x.days.length)return null;const m=(x.m||{})[sid]||{};let n=0;x.days.forEach(d=>{if(d.x)return;const st=m[d.d];if(st&&ATABS.includes(st))n+=(+d.h>0?+d.h:1);});return n;}
 const isoD=dt=>dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
