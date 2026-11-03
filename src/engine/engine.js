@@ -57,12 +57,13 @@ const LISTENERS = []
 const reg = (type, fn) => LISTENERS.push([type, (e) => { try { fn(e) } catch (err) { console.error(err); toast('เกิดข้อผิดพลาด: ' + err.message) } finally { persist() } }])
 
 const P = {}
-function grade(x){return x>=80?4:x>=75?3.5:x>=70?3:x>=65?2.5:x>=60?2:x>=55?1.5:x>=50?1:0;}
+// ตัดเกรดจากคะแนนรวมที่ปัดเป็นจำนวนเต็มแล้ว (x.5 ขึ้นไปปัดขึ้น) ให้ตรงกับคะแนนที่แสดงในใบแจ้งผล
+function grade(x){x=Math.round(x+1e-9);return x>=80?4:x>=75?3.5:x>=70?3:x>=65?2.5:x>=60?2:x>=55?1.5:x>=50?1:0;}
 const gp=g=>`<span class="pill ${g>=3?'p-good':g>=1?'p-gold':'p-bad'}">${g}</span>`;
 function evMiss(code,T,R){if(S.tpl)return 0;const st=S.ev[code+'|'+T]||{};return R.filter(r=>!EVK.every(([k,,,it])=>evOverall((st[r.s.id]||{})[k],it.length))).length;}
 function myCodes(){if(S.tpl)return [...new Set(CAT.filter(c=>isPri(c.level)||c.term===S.term).map(c=>c.code))];const own=()=>S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return x&&(isPri(x.level)||x.term===S.term);});
   const mine=[...new Set(own())];if(isAdmin()&&!S.allSubj&&mine.length)return mine;
-  return [...new Set(isAdmin()?CAT.filter(c=>S.openSubj.has(c.code)&&(isPri(c.level)||c.term===S.term)).map(c=>c.code):S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return isPri(x.level)||x.term===S.term;}))];}
+  return [...new Set(isAdmin()?CAT.filter(c=>(S.openSubj.has(c.code)||S.regs.some(r=>r.status==='ok'&&r.codes.includes(c.code)))&&(isPri(c.level)||c.term===S.term)).map(c=>c.code):S.regs.filter(r=>r.t===S.role&&r.status==='ok').flatMap(r=>r.codes).filter(c=>{const x=CAT.find(y=>y.code===c);return isPri(x.level)||x.term===S.term;}))];}
 const TK=(code,T)=>{T=T||S.term;const c=CAT.find(x=>x.code===code);return(c&&isPri(c.level)&&T===1)?code+'~1':code;};
 const uk=(T,l)=>(T===1&&isPri(CAT.find(x=>x.code===S.scCode).level))?'①'+l:l;
 // ค่าตั้งวิชาที่เป็นค่าเริ่มต้นถูกบันทึกเป็น {} (ดู cleaned) → เติมค่าที่ขาดทุกครั้งที่อ่าน กันหน้าพังเมื่อโหลดจาก Firestore
@@ -163,7 +164,7 @@ P.progress=()=>{
    <td>${r.nt?'-':`${p.full}/${p.n}${bar(r)}`}</td><td>${r.nt?'-':p.att?'<span class="pill p-good">มีแล้ว</span>':'<span class="pill p-warn">ยังไม่มี</span>'}</td>
    <td>${r.nt?'-':!p.needEv?'<span class="small muted">ไม่ต้อง</span>':p.em?`<span class="pill p-warn">ขาด ${p.em} คน</span>`:p.n?'<span class="pill p-good">ครบ</span>':'-'}</td>
    <td><span class="pill ${PST[p.st][1]}">${PST[p.st][0]}</span>${p.sub?`<div class="small muted">${new Date(p.sub.at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'})}</div>`:''}</td>
-   <td>${r.nt?'':`<button class="btn sm alt" data-go="scores@${r.code}">เปิด</button>${p.sub?` <button class="btn sm alt" data-act="unsub" data-c="${r.code}">${isAdmin()?'ส่งกลับ':'ยกเลิกส่ง'}</button>`:p.st==='full'&&!isAdmin()?` <button class="btn sm" data-act="dosub" data-c="${r.code}">ส่งผล</button>`:''}`}</td></tr>`;}).join('');
+   <td>${r.nt?'':`<button class="btn sm alt" data-go="scores@${r.code}" title="ไปหน้าบันทึกคะแนนของวิชานี้">${isAdmin()?'ดูคะแนน':'กรอกคะแนน'}</button>${p.sub?` <button class="btn sm alt" data-act="unsub" data-c="${r.code}">${isAdmin()?'ส่งกลับ':'ยกเลิกส่ง'}</button>`:p.st==='full'&&!isAdmin()?` <button class="btn sm" data-act="dosub" data-c="${r.code}">ส่งผล</button>`:''}`}</td></tr>`;}).join('');
   return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>
   <div class="grid"><div class="card kpi"><b>${rows.length}</b>วิชาทั้งหมด</div><div class="card kpi"><b style="color:#2e7d32">${cnt('sent')}</b>ส่งผลแล้ว</div><div class="card kpi"><b>${cnt('full')}</b>กรอกครบ รอส่ง</div><div class="card kpi"><b>${cnt('part')+cnt('none')+cnt('noteacher')}</b>ยังไม่เสร็จ</div></div>
   <div class="card stack"><h3>${isAdmin()?'ความคืบหน้าการบันทึกผลทุกวิชา':'วิชาของฉัน: บันทึกแล้วหรือยัง'} · ภาคเรียนที่ ${T}</h3>
@@ -577,93 +578,59 @@ function rptData(L,T){T=T||S.term;const pri=isPri(L);
  const cal=subs.map(c=>({c,R:calc(c.code,T)}));const stus=ACT().filter(s=>s.level===L);
  return {cal,stus,T,pri,mode:pri?(T===1?'p1':'p2'):'s'};}
 const rname=(L,s,T)=>`ใบแจ้งผลการเรียน_${L}_ภาคเรียน${T||S.term}_ปีการศึกษา${S.year}_${s?s.name.replace(/\s+/g,'_'):'ทั้งห้อง'}.pdf`.replace(/[\\/:*?"<>|]/g,'');
-// ใบแจ้งผลมัธยม: "แบบรายงานประจำตัวนักเรียน" หน้าเดียว A4 (หน่วยกิต สอบปกติ/แก้ตัว คุณลักษณะ อ่านคิดวิเคราะห์เขียน สรุปหน่วยกิต/GPA)
+// ใบแจ้งผล "แบบรายงานประจำตัวนักเรียน" หน้าเดียว A4 ใช้แบบเดียวกันทั้งประถมและมัธยม (ไม่แสดงเวลาเรียน)
+//  มัธยม (s): หน่วยกิต = ชั่วโมง/ภาคเรียน ÷ 40 · คะแนนเต็ม 100 · ตัดเกรดทุกภาค
+//  ประถม ภาค 1 (p1): น้ำหนัก = ชั่วโมงทั้งปี ÷ 40 · คะแนนภาค 1 เต็ม 50 · ยังไม่ตัดเกรด/ยังไม่ประเมิน
+//  ประถม ภาค 2 (p2): คะแนนรวมทั้งปี เต็ม 100 · ตัดเกรดและประเมินทั้งปี
 const EVN=lab=>lab?3-EVL.indexOf(lab):null;
 const evLabOf=m=>m==null?'-':EVL[3-(m>=2.5?3:m>=1.5?2:m>=1?1:0)];
-const credOf=(code,T)=>(+cfgOf(code,T).hours||40)/40;
+const credOf=(code,T,pri)=>pri?((+cfgOf(code,1).hours||40)+(+cfgOf(code,2).hours||40))/40:(+cfgOf(code,T).hours||40)/40;
 const fmtCr=x=>(Math.round(x*10)/10).toFixed(1);
-function rptPageS(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rpt[L]||{},T=D.T,showSc=st.sc!==false;
+function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rpt[L]||{},T=D.T,M=D.mode,pri=D.pri,p1=M==='p1';
+ const showSc=p1||st.sc!==false,crW=pri?'น้ำหนัก':'หน่วยกิต',full=p1?50:100;
  const rows=D.cal.map(x=>{const c=x.c,r=x.R.find(q=>q.s.id===s.id)||{},k=c.code+'|'+T,fx=((S.fix[k]||{})[s.id])||{},ev=((S.ev[k]||{})[s.id])||{};
-  const after=String(fx.after||'').trim(),afN=after!==''&&!isNaN(+after)?+after:null;
-  const eff=afN!=null?afN:(typeof r.g==='number'?r.g:null);
-  return {c,r,add:c.code[3]==='2',cr:credOf(c.code,T),after,eff,ea:EVN(evOverall(ev.a,EVK[0][3].length)),er:EVN(evOverall(ev.r,EVK[1][3].length))};});
- const crS=l=>l.reduce((a,x)=>a+x.cr,0),crG=l=>l.reduce((a,x)=>a+(x.eff!=null&&x.eff>=1?x.cr:0),0);
+  const g=p1?null:r.g,after=p1?'':String(fx.after||'').trim(),afN=after!==''&&!isNaN(+after)?+after:null;
+  const eff=afN!=null?afN:(typeof g==='number'?g:null),score=p1?r.cur:M==='p2'?r.sum:r.tot;
+  return {c,g,score,add:c.code[3]==='2',cr:credOf(c.code,T,pri),after,eff,
+   ea:p1?null:EVN(evOverall(ev.a,EVK[0][3].length)),er:p1?null:EVN(evOverall(ev.r,EVK[1][3].length))};});
+ const crS=l=>l.reduce((a,x)=>a+x.cr,0),crG=l=>p1?'-':fmtCr(l.reduce((a,x)=>a+(x.eff!=null&&x.eff>=1?x.cr:0),0));
  const base=rows.filter(x=>!x.add),add=rows.filter(x=>x.add);
- const gr=rows.filter(x=>x.eff!=null),gpa=gr.length?gr.reduce((a,x)=>a+x.eff*x.cr,0)/crS(gr):null;
+ const gr=rows.filter(x=>x.eff!=null),gpa=!p1&&gr.length?gr.reduce((a,x)=>a+x.eff*x.cr,0)/crS(gr):null;
  const avg=a=>{a=a.filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null;};
- const evA=evLabOf(avg(rows.map(x=>x.ea))),evR=evLabOf(avg(rows.map(x=>x.er)));
+ const evA=p1?'ประเมินในภาคเรียนที่ 2':evLabOf(avg(rows.map(x=>x.ea))),evR=p1?'ประเมินในภาคเรียนที่ 2':evLabOf(avg(rows.map(x=>x.er)));
  const clubE=Object.entries(S.members).find(([,m])=>(m.ids||[]).includes(s.id));
  const acts=ACTS.map(a=>{if(a==='ชุมนุม')return {n:clubE?`ชุมนุม (${clubE[0]})`:'ชุมนุม',v:clubE?((clubE[1].v||{})[s.id]||'-'):'-'};return {n:a,v:((S.acts[L+'|'+a]||{}).v||{})[s.id]||'-'};});
- const actAll=acts.some(a=>a.v==='มผ')?'มผ':acts.every(a=>a.v==='ผ')?'ผ':'-';
- const gTxt=g=>g==null?'-':g;
- const note=x=>x.r.g==='มส'?'เวลาเรียนไม่ถึง 80%':x.r.g==='ร'?'รอการตัดสิน':'';
+ const actAll=p1?'ประเมินในภาคเรียนที่ 2':acts.some(a=>a.v==='มผ')?'มผ':acts.every(a=>a.v==='ผ')?'ผ':'-';
  const nC=showSc?10:9;
- const line=x=>`<tr><td class="num">${x.c.code}</td><td>${esc(x.c.name)}</td><td class="num">${x.add?'เพิ่มเติม':'พื้นฐาน'}</td><td class="num">${fmtCr(x.cr)}</td>${showSc?`<td class="num">${x.r.tot==null?'-':f1(x.r.tot)}</td>`:''}<td class="num b">${gTxt(x.r.g)}</td><td class="num b">${esc(x.after)}</td><td class="num">${x.ea==null?'-':x.ea}</td><td class="num">${x.er==null?'-':x.er}</td><td class="nt">${note(x)}</td></tr>`;
- const aLine=a=>`<tr><td></td><td>${esc(a.n)}</td><td class="num">กิจกรรม</td><td></td>${showSc?'<td class="num">-</td>':''}<td class="num b">${a.v}</td><td></td><td></td><td></td><td></td></tr>`;
+ const line=x=>`<tr><td class="num">${x.c.code}</td><td>${esc(x.c.name)}</td><td class="num">${x.add?'เพิ่มเติม':'พื้นฐาน'}</td><td class="num">${fmtCr(x.cr)}</td>${showSc?`<td class="num${p1?' b':''}">${x.score==null?'-':Math.round(x.score+1e-9)}</td>`:''}<td class="num b">${x.g==null?'-':x.g}</td><td class="num b">${esc(x.after)}</td><td class="num">${x.ea==null?'-':x.ea}</td><td class="num">${x.er==null?'-':x.er}</td><td class="nt"></td></tr>`;
+ const aLine=a=>`<tr><td></td><td>${esc(a.n)}</td><td class="num">กิจกรรม</td><td></td>${showSc?'<td class="num">-</td>':''}<td class="num b">${p1?'-':a.v}</td><td></td><td></td><td></td><td></td></tr>`;
  const n=rows.length+acts.length,fs=n<=18?13.5:n<=22?12.5:n<=26?11.5:10.5;
  const sigT=st.t?S.sigs[hr[0]]:null,sigD=st.dir?sc.officers.dir.sig:null;
  const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'..............................................'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
- const lvTxt='มัธยมศึกษาปีที่ '+L.replace('ม.','');
+ const lvTxt=(pri?'ประถมศึกษาปีที่ ':'มัธยมศึกษาปีที่ ')+L.replace(/^[ปม]\./,'');
+ const tTxt=M==='p2'?'ภาคเรียนที่ 2 (ผลการเรียนทั้งปี)':'ภาคเรียนที่ '+T;
+ const note=p1?'ภาคเรียนที่ 1 ของประถมแจ้งคะแนน (เต็มวิชาละ 50) ยังไม่ตัดสินระดับผลการเรียน ผลทั้งปีแจ้งเมื่อสิ้นภาคเรียนที่ 2 · ':M==='p2'?'คะแนนรวมทั้งปี = ภาคเรียนที่ 1 (50) + ภาคเรียนที่ 2 (50) · ':'';
  return `<div class="pg rp rps" style="--rfs:${fs}pt"><div class="rpsk">ปพ.6</div>
- <div class="rhd"><img src="${LOGO}" alt=""><b>แบบรายงานประจำตัวนักเรียน</b><span>${esc(sc.name)} &nbsp; ${esc(sc.area)}</span><span>ชั้น${lvTxt} &nbsp; ภาคเรียนที่ ${T} &nbsp; ปีการศึกษา ${yr}</span></div>
+ <div class="rhd"><img src="${LOGO}" alt=""><b>แบบรายงานประจำตัวนักเรียน</b><span>${esc(sc.name)} &nbsp; ${esc(sc.area)}</span><span>ชั้น${lvTxt} &nbsp; ${tTxt} &nbsp; ปีการศึกษา ${yr}</span></div>
  <div class="rpsn"><span><b>ชื่อ</b> ${esc(s.name)}</span><span><b>เลขประจำตัว</b> ${s.sid?esc(s.sid):'..........'}</span><span><b>ชั้น</b> ${L}</span><span><b>เลขที่</b> ${s.no}</span></div>
- <div class="tw"><table class="rs3"><colgroup><col style="width:10%"><col><col style="width:8%"><col style="width:7%">${showSc?'<col style="width:6%">':''}<col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:9%"><col style="width:8%"></colgroup>
- <thead><tr><th rowspan="2">รหัสวิชา</th><th rowspan="2">รายวิชา</th><th rowspan="2">ประเภท</th><th rowspan="2">หน่วยกิต</th><th colspan="${showSc?3:2}">การประเมินผลสัมฤทธิ์</th><th rowspan="2">คุณ<br>ลักษณะ</th><th rowspan="2">อ่าน คิด<br>วิเคราะห์ เขียน</th><th rowspan="2">หมายเหตุ</th></tr>
- <tr>${showSc?'<th>คะแนน</th>':''}<th>สอบปกติ</th><th>แก้ตัว</th></tr></thead>
+ <div class="tw"><table class="rs3"><colgroup><col style="width:10%"><col><col style="width:7%"><col style="width:7%">${showSc?'<col style="width:7%">':''}<col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:9%"><col style="width:9%"></colgroup>
+ <thead><tr><th rowspan="2">รหัสวิชา</th><th rowspan="2">รายวิชา</th><th rowspan="2">ประเภท</th><th rowspan="2">${crW}</th><th colspan="${showSc?3:2}">การประเมินผลสัมฤทธิ์</th><th rowspan="2">คุณ<br>ลักษณะ</th><th rowspan="2">อ่าน คิด<br>วิเคราะห์ เขียน</th><th rowspan="2">หมายเหตุ</th></tr>
+ <tr>${showSc?`<th>คะแนน<br>(${full})</th>`:''}<th>สอบปกติ</th><th>แก้ตัว</th></tr></thead>
  <tbody>${base.map(line).join('')}${add.map(line).join('')}${acts.map(aLine).join('')}${rows.length?'':`<tr><td colspan="${nC}" class="num">ยังไม่มีรายวิชา</td></tr>`}</tbody></table></div>
  <div class="rpsb"><div class="tw"><table class="rs3 rsum"><thead><tr><th rowspan="2">สรุปผลการประเมิน</th><th colspan="2">ผลการเรียน</th></tr><tr><th>ที่เรียน</th><th>ที่ได้</th></tr></thead><tbody>
- <tr><td>จำนวนหน่วยกิตรายวิชาพื้นฐาน</td><td class="num">${fmtCr(crS(base))}</td><td class="num">${fmtCr(crG(base))}</td></tr>
- <tr><td>จำนวนหน่วยกิตรายวิชาเพิ่มเติม</td><td class="num">${fmtCr(crS(add))}</td><td class="num">${fmtCr(crG(add))}</td></tr>
- <tr><td>รวมจำนวนหน่วยกิต</td><td class="num">${fmtCr(crS(rows))}</td><td class="num">${fmtCr(crG(rows))}</td></tr>
+ <tr><td>จำนวน${crW}รายวิชาพื้นฐาน</td><td class="num">${fmtCr(crS(base))}</td><td class="num">${crG(base)}</td></tr>
+ <tr><td>จำนวน${crW}รายวิชาเพิ่มเติม</td><td class="num">${fmtCr(crS(add))}</td><td class="num">${crG(add)}</td></tr>
+ <tr><td>รวมจำนวน${crW}</td><td class="num">${fmtCr(crS(rows))}</td><td class="num">${crG(rows)}</td></tr>
  <tr><td>ระดับผลการเรียนเฉลี่ย (GPA)</td><td class="num b" colspan="2">${gpa==null?'-':gpa.toFixed(2)}</td></tr>
  <tr><td>ผลการประเมินคุณลักษณะอันพึงประสงค์</td><td class="num" colspan="2">${evA}</td></tr>
  <tr><td>ผลการประเมินการอ่าน คิดวิเคราะห์ และเขียน</td><td class="num" colspan="2">${evR}</td></tr>
  <tr><td>ผลการประเมินกิจกรรมพัฒนาผู้เรียน</td><td class="num" colspan="2">${actAll}</td></tr></tbody></table></div>
  <div class="rpss">${sg(sigT,hr.length?USERS[hr[0]].name:'','ครูที่ปรึกษา')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
- <div class="small">คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน · หน่วยกิตคิดจากเวลาเรียน 40 ชั่วโมง = 1.0 หน่วยกิต</div></div>`;}
-function rptPage(L,s,D){if(D.mode==='s')return rptPageS(L,s,D);const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rpt[L]||{},T=D.T,M=D.mode;
- const rows=D.cal.map(x=>{const r=x.R.find(q=>q.s.id===s.id);return {c:x.c,add:x.c.code[3]==='2',r};});
- const pctOf=r=>M==='p1'?(r.cur==null?null:r.cur/50*100):M==='p2'?r.sum:r.tot;
- const have=rows.filter(x=>pctOf(x.r)!=null),mean=have.length?have.reduce((a,x)=>a+pctOf(x.r),0)/have.length:null,ap=rows.filter(x=>x.r.pct!=null),mAtt=ap.length?ap.reduce((a,x)=>a+x.r.pct,0)/ap.length:null;
- const gn=rows.map(x=>x.r.g).filter(g=>typeof g==='number'),gpa=gn.length?gn.reduce((a,b)=>a+b,0)/gn.length:null;
- const nm=s.name.trim().split(/\s+/),sur=nm.length>1?nm.pop():'',fn=nm.join(' ');
- const sigT=st.t?S.sigs[hr[0]]:null,sigD=st.dir?sc.officers.dir.sig:null;
- const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'..............................................'}</div><div>( ${name||'........................................'} )</div><div>${role}</div></div>`;
- const att=r=>r.pct==null?'-':r.pct.toFixed(1);
- const cols={p1:6,p2:8,s:6}[M];
- const head={p1:`<tr><th rowspan="2">รหัสวิชา</th><th rowspan="2">รายวิชา</th><th colspan="4">ภาคเรียนที่ 1</th></tr><tr><th>คะแนนเต็ม</th><th>คะแนนที่ได้</th><th>เวลาเรียน (%)</th><th>หมายเหตุ</th></tr>`,
-  p2:`<tr><th rowspan="2">รหัสวิชา</th><th rowspan="2">รายวิชา</th><th colspan="6">ผลการเรียนทั้งปี</th></tr><tr><th>ภาคเรียนที่ 1 (50)</th><th>ภาคเรียนที่ 2 (50)</th><th>รวม (100)</th><th>ระดับผลการเรียน</th><th>เวลาเรียน (%)</th><th>หมายเหตุ</th></tr>`,
-  s:`<tr><th rowspan="2">รหัสวิชา</th><th rowspan="2">รายวิชา</th><th colspan="4">ภาคเรียนที่ ${T}</th></tr><tr><th>คะแนนเต็ม</th><th>คะแนนที่ได้</th><th>ระดับผลการเรียน</th><th>เวลาเรียน (%)</th></tr>`}[M];
- const line=x=>{const r=x.r,c=x.c;return `<tr><td class="num">${c.code}</td><td>${esc(c.name)}</td>`+({
-  p1:`<td class="num">50</td><td class="num sc">${f1(r.cur)}</td><td class="num">${att(r)}</td><td class="num"></td>`,
-  p2:`<td class="num">${f1(r.pr)}</td><td class="num">${f1(r.cur)}</td><td class="num sc">${f1(r.sum)}</td><td class="num sc">${r.g==null?'-':r.g}</td><td class="num">${att(r)}</td><td class="num"></td>`,
-  s:`<td class="num">100</td><td class="num sc">${f1(r.tot)}</td><td class="num sc">${r.g==null?'-':r.g}</td><td class="num">${att(r)}</td>`}[M])+`</tr>`;};
- const grp=(t,l)=>l.length?`<tr><th class="grp" colspan="${cols}">${t}</th></tr>${l.map(line).join('')}`:'';
- const avgRow=M==='p1'?`<tr><th colspan="3" style="text-align:right">คะแนนเฉลี่ยร้อยละ</th><td colspan="3" class="avg">${mean==null?'-':mean.toFixed(1)}</td></tr>`
-  :`<tr><th colspan="${M==='p2'?4:3}" style="text-align:right">คะแนนเฉลี่ยร้อยละ</th><td colspan="${cols-(M==='p2'?4:3)}" class="avg">${mean==null?'-':mean.toFixed(1)}</td></tr>`;
- const actRes=a=>{if(a==='ชุมนุม'){const m=Object.values(S.members).find(m=>(m.ids||[]).includes(s.id));return m?((m.v||{})[s.id]||'-'):'-';}const v=((S.acts[L+'|'+a]||{}).v||{})[s.id];return v||'-';};
- const sumRows=M==='p1'?`<tr><td colspan="2">จำนวนรายวิชาที่มีคะแนน</td><td class="num">${have.length} / ${rows.length}</td></tr>
-  <tr><td colspan="2">เวลาเรียนเฉลี่ย (ร้อยละ)</td><td class="num">${mAtt==null?'-':mAtt.toFixed(1)}</td></tr>
-  <tr><td colspan="2">คุณลักษณะอันพึงประสงค์ การอ่าน คิดวิเคราะห์และเขียน สมรรถนะ และกิจกรรมพัฒนาผู้เรียน</td><td class="num">ประเมินในภาคเรียนที่ 2</td></tr>`
-  :`<tr><td colspan="2">ผลการเรียนเฉลี่ย (GPA)</td><td class="num">${gpa==null?'-':gpa.toFixed(2)}</td></tr>
-  <tr><td colspan="2">เวลาเรียนเฉลี่ย (ร้อยละ)</td><td class="num">${mAtt==null?'-':mAtt.toFixed(1)}</td></tr>
-  ${['ชุมนุม','แนะแนว','ลูกเสือ-เนตรนารี','กิจกรรมเพื่อสังคมและสาธารณประโยชน์'].map(a=>`<tr><td colspan="2">กิจกรรมพัฒนาผู้เรียน: ${a}</td><td class="num">${actRes(a)}</td></tr>`).join('')}`;
- const note={p1:'หมายเหตุ: ภาคเรียนที่ 1 ของประถมยังไม่ตัดสินระดับผลการเรียน (คะแนนเต็มวิชาละ 50) ผลการเรียนทั้งปีประกาศเมื่อสิ้นภาคเรียนที่ 2 · นักเรียนต้องมีเวลาเรียนไม่ต่ำกว่าร้อยละ 80',
-  p2:'หมายเหตุ: ผลการเรียนทั้งปี = ภาคเรียนที่ 1 (50) + ภาคเรียนที่ 2 (50) = 100 คะแนน · เวลาเรียนนับรวมทั้งปี ต้องไม่ต่ำกว่าร้อยละ 80 · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน',
-  s:'หมายเหตุ: มัธยมตัดสินผลการเรียนทุกภาคเรียน · นักเรียนต้องมีเวลาเรียนไม่ต่ำกว่าร้อยละ 80 · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน'}[M];
- return `<div class="pg rp"><div class="pj">ปพ.6</div>
- <div class="rhd"><img src="${LOGO}" alt=""><b>แบบรายงานผลการพัฒนาคุณภาพผู้เรียนรายบุคคล</b><b>ภาคเรียนที่ ${T}${M==='p2'?' (ประกาศผลทั้งปี)':''} ปีการศึกษา ${yr} &nbsp; ${esc(sc.name)}</b><span>${esc(sc.area)}</span></div>
- <div class="rn"><div class="lbl">ข้อมูลนักเรียน</div><div class="rl"><span><b>ชื่อ</b> ${esc(fn)}</span><span><b>สกุล</b> ${esc(sur)}</span><span><b>ชั้น</b> ${L}</span><span><b>เลขที่</b> ${s.no}</span>${s.sid?`<span><b>เลขประจำตัว</b> ${esc(s.sid)}</span>`:''}</div></div>
- <div class="tw"><table class="rt2"><thead>${head}</thead><tbody>
- ${grp('วิชาพื้นฐาน',rows.filter(x=>!x.add))}${grp('วิชาเพิ่มเติม',rows.filter(x=>x.add))}
- ${avgRow}</tbody></table></div>
- <div class="tw"><table class="rt2"><thead><tr><th colspan="2">สรุปผลภาคเรียนที่ ${T}</th><th>ผล</th></tr></thead><tbody>${sumRows}</tbody></table></div>
- <div class="small">${note}</div>
- <div class="sg3">${sg(sigT,hr.length?USERS[hr[0]].name:'','ครูประจำชั้น')}${sg(sigD,sc.officers.dir.name,'ผู้อำนวยการโรงเรียน')}${sg(null,'','ผู้ปกครองรับทราบ')}</div></div>`;}
+ <div class="small">${note}คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน · ${crW} 1.0 = 40 ชั่วโมง${pri?'ต่อปี':'ต่อภาคเรียน'}</div></div>`;}
 
 P.report=()=>{const L=LEVELS.includes(S.rpLevel)?S.rpLevel:'ป.3',D=rptData(L),T=D.T,s=D.stus.find(x=>x.id===S.rpStu)||D.stus[0],st=S.rpt[L]||(S.rpt[L]={});
  const ttl={p1:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 1',p2:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 2 (ผลทั้งปี)',s:`ใบแจ้งผลการเรียน มัธยม ภาคเรียนที่ ${T}`}[D.mode];
- const dsc={p1:'แจ้งคะแนนทุกวิชาของนักเรียน (เต็มวิชาละ 50) พร้อมเวลาเรียน ให้ผู้ปกครองรับทราบ ยังไม่ตัดสินเกรด',p2:'แจ้งผลการเรียนทั้งปี (ภาคเรียนที่ 1 + 2 = 100) ระดับผลการเรียน เวลาเรียนรวมทั้งปี และผลกิจกรรมพัฒนาผู้เรียน',s:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4: หน่วยกิต ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรมพัฒนาผู้เรียน สรุปหน่วยกิตและ GPA (ติ๊กเลือกได้ว่าจะแสดงคะแนนรวมหรือไม่)'}[D.mode];
+ const dsc={p1:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4 (แบบเดียวกับมัธยม): แจ้งคะแนนภาคเรียนที่ 1 เต็มวิชาละ 50 ยังไม่ตัดเกรด การประเมินและกิจกรรมแจ้งในภาคเรียนที่ 2',p2:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4 (แบบเดียวกับมัธยม): ผลการเรียนทั้งปี น้ำหนัก ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรม และ GPA',s:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4: หน่วยกิต ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรมพัฒนาผู้เรียน สรุปหน่วยกิตและ GPA'}[D.mode];
  return `<div class="stack"><div class="row">${LEVELS.map(l=>`<button class="chip" aria-pressed="${l===L}" data-rl="${l}">${l}</button>`).join('')}</div>
  <div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${S.term===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>
  <div class="card stack"><h3>${ttl}</h3><div class="small muted">${dsc}</div>
@@ -671,7 +638,7 @@ P.report=()=>{const L=LEVELS.includes(S.rpLevel)?S.rpLevel:'ป.3',D=rptData(L),
  <code style="word-break:break-all">${esc(rname(L,s,T))}</code>
  <div class="row"><button class="btn sm" data-act="rdl" data-w="one">PDF รายบุคคล</button><button class="btn sm alt" data-act="rdl" data-w="all">PDF ทั้งห้อง (${D.stus.length} คน คนละหน้า)</button></div>
  <code style="word-break:break-all">${esc(rname(L,null,T))}</code>
- <div class="row">${D.mode==='s'?`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`:''}<label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${isAdmin()?`<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
+ <div class="row">${D.mode==='p1'?'<span class="small muted">ภาคเรียนที่ 1 ประถมแสดงคะแนนเสมอ (ยังไม่มีเกรด)</span>':`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`}<label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${isAdmin()?`<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
  ${D.cal.length?'':'<div class="card empty">ชั้นนี้ยังไม่มีรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}
  ${D.stus.length&&D.cal.length?rptPage(L,s,D):''}</div>`;};
 const PRI_L=['ป.1','ป.2','ป.3','ป.4','ป.5','ป.6'];
@@ -857,7 +824,7 @@ reg('click', (e) => {
   if (!t || !$('#view') || !$('#view').contains(t)) return
   const d = t.dataset
   if (d.gk) { S.guideKind = d.gk; render(); return }
-  if (d.go) { const [pg, cd] = d.go.split('@'); if (cd) S.scCode = cd; CTX.go(pg); return }
+  if (d.go) { const [pg, cd] = d.go.split('@'); if (cd) { if (isAdmin() && !myCodes().includes(cd)) S.allSubj = true; S.scCode = cd } CTX.go(pg); return }
   if (d.term) { CTX.setTerm(+d.term); return }
   if (d.sumlv) { S.sumLv = d.sumlv; render(); return }
   if (d.actlv) { S.actLevel = d.actlv; render(); return }
