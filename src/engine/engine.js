@@ -1034,7 +1034,13 @@ function persist() {
   for (const id of Object.keys(metaOfId)) {
     const { b, sub } = metaOfId[id]
     if (id.startsWith(S.year + '~') && S[b][sub] === undefined && lastJson[id] !== undefined) {
-      delete lastJson[id]; delete pending[id]; deleteDoc(doc(db, 'work', id)).catch(report); delete metaOfId[id]
+      const old = lastJson[id]
+      delete lastJson[id]; delete pending[id]; delete metaOfId[id]
+      // ลบไม่สำเร็จ (เช่น ไม่มีสิทธิ์) → คืนค่าเดิมบนหน้าจอ ไม่ให้หน้าจอขึ้นว่าทำสำเร็จทั้งที่ข้อมูลบนเซิร์ฟเวอร์ยังอยู่
+      deleteDoc(doc(db, 'work', id)).catch((err) => {
+        if (S[b][sub] === undefined) { S[b][sub] = JSON.parse(old); lastJson[id] = old; metaOfId[id] = { b, sub }; render() }
+        report(err)
+      })
     }
   }
   persistSettings(); persistSig()

@@ -82,7 +82,12 @@ service cloud.firestore {
         isAdmin()
         || request.resource.data.bucket in ['acts', 'members', 'rpt']
         || teachesSubject(request.resource.data));
-      allow delete: if signedIn() && (isAdmin() || resource.data.bucket in ['acts', 'members', 'rpt']);
+      // ลบได้ตามสิทธิ์เดียวกับการแก้ไข: ครูที่สอนวิชานั้นลบเอกสารของวิชาตนเองได้
+      // (เช่น "ยกเลิกการส่ง" = ลบเอกสาร sub ของวิชา ซึ่งเดิมครูลบไม่ได้ จึงขึ้น "ไม่มีสิทธิ์")
+      allow delete: if signedIn() && (
+        isAdmin()
+        || resource.data.bucket in ['acts', 'members', 'rpt']
+        || teachesSubject(resource.data));
     }
 
     // แจ้งเตือน: อ่านได้เฉพาะผู้รับ (หรือแอดมินถ้าส่งถึง admins) ส่งได้เมื่อระบุผู้ส่งเป็นตนเอง
