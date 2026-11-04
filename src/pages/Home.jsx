@@ -1,3 +1,4 @@
+import StudentLinkCard from '../components/StudentLinkCard'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
@@ -60,6 +61,7 @@ export default function Home() {
           ? <div className="card kpi"><b>{pending}</b>รออนุมัติลงทะเบียนสอน</div>
           : <div className="card kpi"><b>{approved}</b>วิชาที่ได้รับอนุมัติแล้ว</div>}
       </div>
+      <StudentLinkCard />
       <div className="card stack">
         <h3>ปีการศึกษา {openYear.year} ภาคเรียนที่ {term}</h3>
         <p className="muted" style={{ margin: 0 }}>

@@ -32,7 +32,7 @@ const PAGES = [
   ['/students', 'รายชื่อนักเรียน', 'นักเรียน', 'users', ADMIN, Students, 'ข้อมูลหลัก'],
   ['/catalog', 'รายวิชา', 'รายวิชา', 'book', ALL, Catalog, 'ข้อมูลหลัก'],
   ['/reg', 'ลงทะเบียนวิชาสอน', 'ลงทะเบียน', 'reg', ALL, Registration, 'การสอน'],
-  ['/progress', 'ความคืบหน้าการบันทึกผล', 'ความคืบหน้า', 'flag', ALL, E('progress'), 'การสอน'],
+  ['/progress', 'ความคืบหน้า', 'ความคืบหน้า', 'flag', ALL, E('progress'), 'การสอน'],
   ['/scores', 'บันทึกคะแนน', 'คะแนน', 'edit', ALL, E('scores'), 'การสอน'],
   ['/att', 'เช็คชื่อรายวัน', 'เช็คชื่อ', 'users', ALL, E('att'), 'การสอน'],
   ['/acts', 'กิจกรรมพัฒนาผู้เรียน', 'กิจกรรม', 'flag', ALL, E('acts'), 'การสอน'],
@@ -145,7 +145,8 @@ export default function App() {
   const { user, loading } = useAuth()
   const loc = useLocation()
   // หน้านักเรียนดูผล เปิดได้โดยไม่ต้องล็อกอิน
-  if (loc.pathname.startsWith('/student')) return <StudentPortal />
+  // หน้านักเรียนดูผล (/student) เปิดได้โดยไม่ต้องล็อกอิน · ระวังอย่าให้ชน /students (รายชื่อนักเรียนของแอดมิน)
+  if (/^\/student\/?$/.test(loc.pathname)) return <StudentPortal />
   if (loading) return <div className="center">กำลังโหลด...</div>
   if (!user) return <Landing />
   if (user.mustChangePassword) return <ChangePassword />

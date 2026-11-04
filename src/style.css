@@ -541,3 +541,20 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .ld-news{align-items:stretch}.ld-date{align-self:stretch;justify-content:flex-start}
 .ld-go{margin-top:8px;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid rgba(243,210,122,.6);background:rgba(243,210,122,.14);color:#f3d27a;font:600 14px var(--f-display);cursor:pointer}
 .ld-go:hover{background:rgba(243,210,122,.24)}
+
+/* เมนูด้านข้างบรรทัดเดียว */
+.nav .nd button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* ส่วนหัวและส่วนท้ายคงที่ ไม่เลื่อนตามเนื้อหา */
+.main>.top{position:sticky;top:8px;z-index:30}
+.main>.top::before{content:"";position:absolute;left:-16px;right:-16px;top:-8px;height:8px;background:var(--bg)}
+@media (min-width:821px){.main>.credit{position:sticky;bottom:0;z-index:30}}
+/* ความคืบหน้ารายครู */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.tcard{border:1px solid var(--line);border-left:4px solid #c4883a;border-radius:14px;padding:12px 14px;display:grid;gap:8px;background:var(--surface,#fff)}
+.tcard.ok{border-left-color:#2e7d32}
+.tsub{display:flex;flex-wrap:wrap;gap:6px}
+.tchip{font-size:.82rem;padding:3px 9px;border-radius:999px;background:var(--warn-soft,#fdebd3);color:var(--warn,#8a4206)}
+.tchip.on{background:var(--good-soft,#dff3e8);color:var(--good,#1f6b44)}
+.pgbar .chip{min-width:38px;justify-content:center}
+.chip.has:not([aria-pressed=true]){border-color:var(--gold,#e0bb4a);background:var(--gold-soft,#f5e9bf)}
+.xbtn{all:unset;cursor:pointer;width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;line-height:1}.xbtn:hover{background:rgba(0,0,0,.1)}

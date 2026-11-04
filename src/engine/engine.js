@@ -6,7 +6,8 @@ import { auth, db } from '../firebase'
 import { printCss } from './printcss'
 import { buildXlsx } from '../lib/xlsx'
 import { htmlToDocx } from '../lib/docx'
-import { ask } from '../lib/dialog'
+import { ask, tell } from '../lib/dialog'
+import { readTable } from '../lib/xlsxRead'
 
 const $ = (s) => document.querySelector(s)
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -159,8 +160,9 @@ function subCard(c,R){
   return `<div class="card row" style="justify-content:space-between"><span class="small"><span class="pill ${PST[p.st][1]}">${PST[p.st][0]}</span> กรอกคะแนนครบ ${p.full}/${p.n} คน${p.sub?` · ส่งเมื่อ ${when} โดย ${esc(p.sub.name||'')}`:''}</span>${p.sub?`<button class="btn sm alt" data-act="unsub" data-c="${c.code}">${isAdmin()?'ส่งกลับให้แก้ไข':'ยกเลิกการส่ง'}</button>`:`<button class="btn sm" data-act="dosub" data-c="${c.code}" ${p.full<p.n||p.em?`disabled title="${p.full<p.n?'กรอกคะแนนให้ครบทุกคนก่อน':'ประเมินผู้เรียนให้ครบทุกหมวดก่อน'}"`:''}>ส่งผลการเรียน</button>`}</div>`;
 }
 P.progress=()=>{
-  const rows=progRows(),T=S.term,F=S.pgF||'all';
-  if(!rows.length)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
+  const all=progRows(),T=S.term,F=S.pgF||'all',LV=S.pgLv||'all',V=isAdmin()?(S.pgView||'subj'):'subj';
+  const rows=all.filter(r=>LV==='all'||r.c.level===LV);
+  if(!all.length)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
   const cnt=k=>rows.filter(r=>r.p.st===k).length;
   const list=rows.filter(r=>F==='all'||r.p.st===F);
   const chip=(k,t)=>`<button class="chip" aria-pressed="${F===k}" data-pgf="${k}">${t}</button>`;
@@ -170,7 +172,19 @@ P.progress=()=>{
    <td>${r.nt?'-':!p.needEv?'<span class="small muted">ไม่ต้อง</span>':p.em?`<span class="pill p-warn">ขาด ${p.em} คน</span>`:p.n?'<span class="pill p-good">ครบ</span>':'-'}</td>
    <td><span class="pill ${PST[p.st][1]}">${PST[p.st][0]}</span>${p.sub?`<div class="small muted">${new Date(p.sub.at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'})}</div>`:''}</td>
    <td>${r.nt?'':`<button class="btn sm alt" data-go="scores@${r.code}" title="ไปหน้าบันทึกคะแนนของวิชานี้">${isAdmin()?'ดูคะแนน':'กรอกคะแนน'}</button>${p.sub?` <button class="btn sm alt" data-act="unsub" data-c="${r.code}">${isAdmin()?'ส่งกลับ':'ยกเลิกส่ง'}</button>`:p.st==='full'&&!isAdmin()?` <button class="btn sm" data-act="dosub" data-c="${r.code}">ส่งผล</button>`:''}`}</td></tr>`;}).join('');
-  return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>
+  const lvs=LEVELS.filter(l=>all.some(r=>r.c.level===l));
+  const lvBar=`<div class="row"><b class="small">ชั้น</b><button class="chip" aria-pressed="${LV==='all'}" data-pglv="all">ทุกชั้น</button>${lvs.map(l=>`<button class="chip" aria-pressed="${LV===l}" data-pglv="${l}">${l}</button>`).join('')}</div>`;
+  const viewBar=isAdmin()?`<div class="row"><b class="small">มุมมอง</b><button class="chip" aria-pressed="${V==='subj'}" data-pgview="subj">รายวิชา</button><button class="chip" aria-pressed="${V==='teacher'}" data-pgview="teacher">รายครู (ส่งครบหรือยัง)</button></div>`:'';
+  // มุมมองรายครู: ครูแต่ละคน วิชาที่ลงทะเบียน และส่งผลแล้วหรือยัง
+  const byT={};rows.filter(r=>!r.nt).forEach(r=>{(byT[r.teacher]||(byT[r.teacher]=[])).push(r);});
+  const tcards=Object.entries(byT).sort((a,b)=>{const da=a[1].every(r=>r.p.st==='sent'),db=b[1].every(r=>r.p.st==='sent');return (da-db)||a[0].localeCompare(b[0],'th');}).map(([t,rs])=>{const done=rs.filter(r=>r.p.st==='sent').length,ok=done===rs.length;
+   return `<div class="tcard${ok?' ok':''}"><div class="row" style="justify-content:space-between"><b>${ok?'✅':'⏳'} ${esc(t)}</b><span class="pill ${ok?'p-good':'p-warn'}">ส่งแล้ว ${done}/${rs.length} วิชา</span></div>
+   <div class="tsub">${rs.sort((a,b)=>a.c.level.localeCompare(b.c.level,'th')||a.code.localeCompare(b.code)).map(r=>`<span class="tchip ${r.p.st==='sent'?'on':''}" title="${esc(PST[r.p.st][0])}">${r.p.st==='sent'?'✓':'•'} ${r.c.level} ${r.code} ${esc(r.c.name)}</span>`).join('')}</div></div>`;}).join('');
+  const nt=rows.filter(r=>r.nt);
+  if(V==='teacher')return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>${viewBar}${lvBar}
+   <div class="card stack"><h3>ครูส่งผลครบหรือยัง · ภาคเรียนที่ ${T}${LV==='all'?'':' · '+LV}</h3><div class="small muted">✓ = ส่งผลแล้ว · • = ยังไม่ส่ง · ครูที่ยังส่งไม่ครบแสดงก่อน</div><div class="tgrid">${tcards||'<div class="empty">ไม่มีข้อมูล</div>'}</div>
+   ${nt.length?`<div class="lock small"><b>วิชาที่ยังไม่มีครูสอน ${nt.length} วิชา:</b> ${nt.map(r=>`${r.c.level} ${r.code} ${esc(r.c.name)}`).join(' · ')}</div>`:''}</div></div>`;
+  return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>${viewBar}${lvBar}
   <div class="grid"><div class="card kpi"><b>${rows.length}</b>วิชาทั้งหมด</div><div class="card kpi"><b style="color:#2e7d32">${cnt('sent')}</b>ส่งผลแล้ว</div><div class="card kpi"><b>${cnt('full')}</b>กรอกครบ รอส่ง</div><div class="card kpi"><b>${cnt('part')+cnt('none')+cnt('noteacher')}</b>ยังไม่เสร็จ</div></div>
   <div class="card stack"><h3>${isAdmin()?'ความคืบหน้าการบันทึกผลทุกวิชา':'วิชาของฉัน: บันทึกแล้วหรือยัง'} · ภาคเรียนที่ ${T}</h3>
   <div class="small muted">ส่งผลได้เมื่อกรอกคะแนนครบทุกคน ${T===1?'· ประถมภาคเรียนที่ 1 ยังไม่ตัดเกรด แต่ส่งผลคะแนนได้':''}</div>
@@ -178,8 +192,10 @@ P.progress=()=>{
   <div class="tw"><table><thead><tr><th>วิชา</th><th>ชั้น</th>${isAdmin()?'<th>ครูผู้สอน</th>':''}<th>นักเรียน</th><th>กรอกคะแนนครบ</th><th>เวลาเรียน</th><th>ประเมิน</th><th>สถานะ</th><th></th></tr></thead><tbody>${tr||'<tr><td colspan="9" class="muted">ไม่มีรายการในกลุ่มนี้</td></tr>'}</tbody></table></div></div></div>`;
 };
 reg('click',e=>{const nx=e.target.closest('[data-nx]');if(nx&&$('#view')&&$('#view').contains(nx)){const [pg,k]=nx.dataset.nx.split('|');if(pg==='eval'&&k)S.evKind=k;if(S.page===pg)render();else CTX.go(pg);if(k==='sub')setTimeout(()=>{const b=document.querySelector('[data-act=dosub],[data-act=unsub]');if(b&&b.scrollIntoView)b.scrollIntoView({block:'center'});},120);return;}
- const t=e.target.closest('[data-pgf],[data-act=dosub],[data-act=unsub]');if(!t||!$('#view')||!$('#view').contains(t))return;
+ const t=e.target.closest('[data-pgf],[data-pglv],[data-pgview],[data-act=dosub],[data-act=unsub]');if(!t||!$('#view')||!$('#view').contains(t))return;
   if(t.dataset.pgf){S.pgF=t.dataset.pgf;render();return;}
+  if(t.dataset.pglv){S.pgLv=t.dataset.pglv;render();return;}
+  if(t.dataset.pgview){S.pgView=t.dataset.pgview;render();return;}
   if(t.dataset.act==='dosub')submitSubject(t.dataset.c||S.scCode);else unsubmitSubject(t.dataset.c||S.scCode);});
 
 /* ---------- เช็คชื่อรายวัน ---------- */
@@ -204,7 +220,7 @@ function attGen(f,e2){
   if(!f||!e2||e2<f)return toast('ตั้งวันเปิด-ปิดภาคเรียนให้ถูกต้องก่อน');
   const have=new Set(A.days.map(x=>x.d));let n=0,skip=0;const d=new Date(f+'T00:00:00'),end=new Date(e2+'T00:00:00');
   while(d<=end&&n<400){const iso=isoD(d),h=+tt[d.getDay()]||0;if(h>0){if(hol.has(iso)){skip++;if(!have.has(iso)){A.days.push({d:iso,h,x:hol.get(iso)});have.add(iso);}}else if(!have.has(iso)){A.days.push({d:iso,h});have.add(iso);n++;}}d.setDate(d.getDate()+1);}
-  A.days.sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);S.attWk=null;
+  A.days.sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);S.attWk=null;S.attPg=null;
   const tot=A.days.filter(x=>!x.x).reduce((p,x)=>p+(+x.h||1),0),H=cfgOf(c,T).hours;
   toast(`สร้างวันเรียน ${n} วัน (รวม ${A.days.filter(x=>!x.x).length} วัน ${tot} ชม.) วันหยุดที่ขีดไว้ ${skip} วัน`);attRender();
   if(tot!==H)ask({title:'ปรับชั่วโมงเรียนทั้งหมดตามที่สร้าง ?',text:`ตอนนี้ตั้งไว้ ${H} ชม. แต่วันเรียนที่สร้างรวม ${tot} ชม.\\nให้ตั้งชั่วโมงทั้งหมดเป็น ${tot} ชม. เพื่อคิดร้อยละเวลาเรียนและ มส. ?`,ok:`ตั้งเป็น ${tot} ชม.`,cancel:'คงเดิม'}).then(y=>{if(y){cfgOf(c,T).hours=tot;attRender();}});
@@ -231,11 +247,12 @@ P.att=()=>{
  if(!codes)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
  const c=CAT.find(x=>x.code===S.scCode),T=S.term,A=attOf(c.code,T),R=calc(c.code,T),H=cfgOf(c.code,T).hours,days=A.days;
  const ids=new Set(R.map(r=>r.s.id));S.attS=(S.attS||[]).filter(i=>ids.has(i));S.attD=(S.attD||[]).filter(d=>days.some(x=>x.d===d));
- const wks=attWeeks(days),today=isoD(new Date());
- if(S.attWk!=='all'&&!wks.some(w=>w[0]===S.attWk)){const cur=wks.find(w=>w[0]===mondayOf(today));const past=wks.filter(w=>w[0]<=today);S.attWk=wks.length?(cur||past[past.length-1]||wks[0])[0]:null;}
- const vd=S.attWk==='all'||!wks.length?days:(wks.find(w=>w[0]===S.attWk)||[0,days])[1];S.attVis=vd.map(x=>x.d);
- const wi=wks.findIndex(w=>w[0]===S.attWk),wl=w=>dShort(w[1][0].d)+(w[1].length>1?'–'+dShort(w[1][w[1].length-1].d):'');
- const wkBar=wks.length?`<div class="row"><button class="btn sm alt" data-at="wkprev" ${wi<=0?'disabled':''}>◀ สัปดาห์ก่อน</button><select id="attwk" aria-label="เลือกสัปดาห์">${wks.map((w,i)=>`<option value="${w[0]}" ${w[0]===S.attWk?'selected':''}>สัปดาห์ที่ ${i+1} (${wl(w)})</option>`).join('')}<option value="all" ${S.attWk==='all'?'selected':''}>ดูทั้งภาคเรียน</option></select><button class="btn sm alt" data-at="wknext" ${wi<0||wi>=wks.length-1?'disabled':''}>สัปดาห์ถัดไป ▶</button><span class="small muted">แสดง ${vd.length} วัน จากทั้งหมด ${days.length} วัน</span></div>`:'';
+ // แสดงวันเรียนต่อเนื่องกัน หน้าละ 20 วัน (เพิ่มวันใหม่ต่อท้ายของเดิม) มีเลขหน้าให้กด
+ const PG=20,np=Math.max(1,Math.ceil(days.length/PG)),today=isoD(new Date());
+ if(S.attPg==null||S.attPg>=np){const tgt=S.attLast||today;let idx=days.findIndex(x=>x.d>=tgt);if(idx<0)idx=days.length-1;S.attPg=Math.max(0,Math.floor(Math.max(0,idx)/PG));}
+ const vd=days.slice(S.attPg*PG,S.attPg*PG+PG);S.attVis=vd.map(x=>x.d);
+ const pgs=Array.from({length:np},(_,i)=>i),pgLbl=i=>{const a=days[i*PG],b=days[Math.min(days.length,(i+1)*PG)-1];return a?dShort(a.d)+'–'+dShort(b.d):''};
+ const wkBar=days.length?`<div class="row pgbar"><button class="btn sm alt" data-at="wkprev" ${S.attPg<=0?'disabled':''} aria-label="หน้าก่อน">◀</button>${pgs.map(i=>`<button class="chip" aria-pressed="${i===S.attPg}" data-at="pg" data-p="${i}" title="${pgLbl(i)}">${i+1}</button>`).join('')}<button class="btn sm alt" data-at="wknext" ${S.attPg>=np-1?'disabled':''} aria-label="หน้าถัดไป">▶</button><span class="small muted">วันที่ ${S.attPg*PG+1}–${S.attPg*PG+vd.length} จากทั้งหมด ${days.length} วัน (${pgLbl(S.attPg)})</span></div>`:'';
  const nHol=days.filter(x=>x.x).length,totH=days.filter(x=>!x.x).reduce((p,x)=>p+(+x.h||1),0),xset=new Set(days.filter(x=>x.x).map(x=>x.d)),ym=days.length?days[0].d.slice(0,4):String(new Date().getFullYear());
  const head=vd.map(x=>x.x?`<th class="atd hol" title="วันหยุด: ${esc(x.x)}"><label><input type="checkbox" data-ad="${x.d}" ${S.attD.includes(x.d)?'checked':''} aria-label="เลือกวันที่ ${dShort(x.d)}"><br><s><b>${dShort(x.d)}</b></s></label><div class="small" style="max-width:70px;white-space:normal;line-height:1.15">${esc(x.x)}</div></th>`:`<th class="atd"><label><input type="checkbox" data-ad="${x.d}" ${S.attD.includes(x.d)?'checked':''} aria-label="เลือกวันที่ ${dShort(x.d)}"><br><b>${dShort(x.d)}</b></label><div class="small muted">${x.h} ชม.</div></th>`).join('');
  const rows=R.map(r=>{const m=A.m[r.s.id]||{},ab=attAbs(c.code,T,r.s.id)||0;
@@ -280,6 +297,7 @@ P.scores=()=>{
   <div class="small muted">คะแนนระหว่างภาคเต็ม ${F.mid} · ปลายภาคเต็ม ${F.fin} · แบ่งช่องคะแนนเก็บได้ตามที่ครูใช้ (ช่องเดียวหรือหลายช่อง)</div>
   ${cfg.cols.map((k,i)=>`<div class="row"><input data-cn="${i}" value="${esc(k.n)}" aria-label="ชื่อคะแนนช่องที่ ${i+1}" placeholder="ชื่อคะแนน เช่น ชิ้นงาน" size="16"><input data-cu="${i}" value="${esc(k.u||'')}" aria-label="หน่วยการเรียนรู้ของช่องที่ ${i+1}" placeholder="หน่วยที่ (ถ้ามี)" size="12"><label class="small muted" for="cm${i}">เต็ม</label><input id="cm${i}" type="number" min="1" data-cm="${i}" value="${k.max}" ${cfg.cols.length===1?'disabled':''} style="width:80px">${cfg.cols.length>1?`<button class="btn sm alt" data-act="delcol" data-i="${i}">ลบช่อง</button>`:''}</div>`).join('')}
   <div class="row"><button class="btn sm alt" data-act="addcol">เพิ่มช่องคะแนนเก็บ</button><span class="pill ${ok?'p-good':'p-warn'}">${ok?'รวมคะแนนเก็บครบ '+F.mid:'รวมช่องคะแนน '+sumMax+' ต้องเท่ากับ '+F.mid}</span></div></div>
+ ${scoreXlCard()}
  <div class="small muted">${pri?'ประถมตัดเกรดเมื่อจบภาคเรียนที่ 2 (เวลาเรียนนับรวมทั้งปี)':'มัธยมตัดเกรดทุกภาคเรียน'} · กรอกเฉพาะชั่วโมงที่ขาด (ไม่กรอก = มาเรียนครบ)</div>
  <div class="tw hd"><table><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th>${cfg.cols.map(k=>`<th>${esc(k.n)} /${k.max}</th>`).join('')}<th>รวมระหว่างภาค</th><th>ปลายภาค /${F.fin}</th><th>ชั่วโมงที่ขาด (ชม.)</th><th>เวลาเรียน %</th>${(!pri||t2)?'<th>ร</th>':''}${head}</tr></thead><tbody>${rows}</tbody></table></div>${(!pri||t2)?nextBtn(c,R,'scores:'):''}</div>`;
 };
@@ -493,9 +511,9 @@ P.p5=()=>{
  <p class="small muted">ข้อมูลผลประเมิน ลายเซ็น และคำอธิบายในต้นแบบเป็นตัวอย่างสมมติ</p></div>`;};
 
 const GUIDE={
- super:[['ตั้งปีการศึกษา','เปิดปีการศึกษาและภาคเรียน ปิดปีเมื่อสิ้นปีเพื่อเก็บข้อมูลและเลื่อนชั้น','years'],['สร้างบัญชีผู้ใช้','สร้างแอดมินโรงเรียนและครู กำหนดรหัสเริ่มต้น รีเซ็ตรหัสเมื่อลืม และส่งออกใบรหัส','users'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่จะเปิดสอนในปีและภาคเรียนนี้','catalog'],['เพิ่มนักเรียน','เพิ่มทีละคนหรือวางรายชื่อหลายคน ระบบเลื่อนชั้นให้เองตอนขึ้นปีใหม่','students'],['อนุมัติการสอน','ตรวจที่ครูลงทะเบียน อนุมัติ หรือส่งกลับพร้อมข้อความ','reg'],['ติดตามและส่งออก','ดูเอกสารของแต่ละวิชาและดาวน์โหลดเป็นหลักฐาน','p5']],
- admin:[['ตั้งค่าโรงเรียน','กรอกชื่อและลายเซ็นของ ผอ. หัวหน้างานวัดผล หัวหน้างานวิชาการ และหัวหน้ากลุ่มสาระ ให้ขึ้นในเล่ม ปพ.5','school'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่เปิดสอนในภาคเรียนนี้ ทีละวิชาหรือหลายวิชา','catalog'],['จัดการนักเรียน','เพิ่มนักเรียนใหม่ ย้ายเข้า หรือวางรายชื่อหลายคน','students'],['อนุมัติการสอน','ตรวจรายการที่ครูลงทะเบียน ถ้าไม่ถูกต้องส่งกลับพร้อมข้อความ','reg'],['ดูคะแนนและกิจกรรม','ติดตามว่าครูกรอกครบหรือยัง ปล่อยสิทธิ์กิจกรรมเมื่อครูกรอกค้าง','acts'],['ลงนามและอนุมัติเล่ม','ในหน้าสมุด ปพ.5 ติ๊กลงนามของหัวหน้าฝ่ายต่าง ๆ และให้ ผอ. อนุมัติ พร้อมวันที่','p5'],['ดาวน์โหลดเอกสาร','ดาวน์โหลด ปพ.5 ของแต่ละวิชาและเอกสารสรุป','p5']],
- teacher:[['ลงทะเบียนวิชาที่สอน','เลือกชั้นที่สอนได้หลายชั้น แล้วติ๊กวิชาที่ตัวเองสอน ส่งให้แอดมินอนุมัติทุกปีการศึกษาและภาคเรียน','reg'],['รอการอนุมัติ','ถ้าแอดมินส่งกลับจะมีแจ้งเตือนและข้อความ ให้แก้แล้วส่งใหม่','reg'],['ตั้งช่องคะแนนเก็บ','ตั้งว่าเก็บกี่ช่อง ช่องละเท่าไร ประถมเลือกเก็บ 100 หรือ 50 ต่อภาคเรียน','scores'],['กรอกคะแนน','กรอกคะแนนแต่ละช่อง ปลายภาค และชั่วโมงที่ขาดเฉพาะคนที่ขาด (ไม่กรอก = มาครบ) ระบบรวมและตัดเกรดให้ ผู้ที่เวลาเรียนต่ำกว่า 80% จะได้ มส.','scores'],['ตัดสินกิจกรรม','ชุมนุมเลือกสมาชิกของตน ส่วนลูกเสือและกิจกรรมเพื่อสังคมเป็นของครูที่ปรึกษา','acts'],['ประเมินผู้เรียน','ให้คะแนนคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะ รายข้อ ทีละคนหรือทั้งห้อง ระบบสรุปผลให้ (ประถมกรอกภาคเรียนที่ 2)','eval'],['ออกใบแจ้งผลการเรียน (ประถม ภาคเรียนที่ 1)','เลือกชั้น ดูตัวอย่างรายบุคคล ดาวน์โหลด PDF รายบุคคลหรือทั้งห้อง พร้อมลงนามครูที่ปรึกษา','report'],['สร้างลายเซ็น','วาดลายเซ็นด้วยนิ้วหรือเมาส์ หรือแนบภาพ ใช้ลงชื่อในเล่ม ปพ.5','sign'],['กรอกข้อมูลประกอบเล่ม','คำอธิบายรายวิชา (ข้อความหรือภาพ) มาตรฐาน/ตัวชี้วัดและเวลาของแต่ละหน่วย แล้วดูรายการตรวจความครบถ้วน','p5'],['ลงนามและดาวน์โหลด ปพ.5','กดลงลายมือชื่อครูผู้สอน ตรวจครบแล้วดาวน์โหลดเป็นหลักฐาน ระบบตั้งชื่อไฟล์ให้','p5']]};
+ super:[['ตั้งปีการศึกษา','เปิดปีการศึกษาและภาคเรียน ปิดปีเมื่อสิ้นปีเพื่อเก็บข้อมูลและเลื่อนชั้น','years'],['สร้างบัญชีผู้ใช้','สร้างแอดมินโรงเรียนและครู กำหนดรหัสเริ่มต้น รีเซ็ตรหัสเมื่อลืม และส่งออกใบรหัส','users'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่จะเปิดสอนในปีและภาคเรียนนี้','catalog'],['เพิ่มนักเรียน','เพิ่มทีละคนหรือวางรายชื่อหลายคน ใส่เลขประจำตัวนักเรียนให้ครบ (นักเรียนใช้เลขนี้ดูผลการเรียน) ระบบเลื่อนชั้นให้เองตอนขึ้นปีใหม่','students'],['อนุมัติการสอน','ตรวจที่ครูลงทะเบียน อนุมัติ หรือส่งกลับพร้อมข้อความ รวมถึงคำขอแก้ไขการลงทะเบียน (ขอเพิ่ม/เอาวิชาออก) · แอดมินที่สอนด้วยให้ลงทะเบียน "วิชาที่ฉันสอน" ไว้ ชื่อจึงจะขึ้นเป็นครูผู้สอน','reg'],['ติดตามความคืบหน้า','เลือกดูทีละชั้นหรือทุกชั้น และสลับเป็นมุมมอง "รายครู" ดูว่าครูแต่ละคนส่งผลครบหรือยัง','progress'],['เผยแพร่ผลให้นักเรียน','เลือกว่านักเรียนเห็นคะแนนหรือเฉพาะเกรด แล้วกดเผยแพร่รายชั้น ถ้าครูแก้คะแนนภายหลังให้กด "เผยแพร่ใหม่"','publish'],['ประกาศหน้าแรก','เพิ่ม แก้ไข ปักหมุด ซ่อน หรือลบประกาศ ตั้ง "วันที่กำหนด" เช่น วันผลการเรียนออก หน้าแรกนับถอยหลังและขึ้นประกาศใหม่ให้เองเมื่อถึงวัน','news'],['ติดตามและส่งออก','ดูเอกสารของแต่ละวิชาและดาวน์โหลดเป็นหลักฐาน','p5']],
+ admin:[['ตั้งค่าโรงเรียน','กรอกชื่อและลายเซ็นของ ผอ. หัวหน้างานวัดผล หัวหน้างานวิชาการ และหัวหน้ากลุ่มสาระ และกำหนดครูที่ปรึกษาประจำชั้น','school'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่เปิดสอนในภาคเรียนนี้ ทีละวิชาหรือหลายวิชา','catalog'],['จัดการนักเรียน','เพิ่มนักเรียนใหม่ ย้ายเข้า หรือวางรายชื่อหลายคน ใส่เลขประจำตัวนักเรียนให้ครบ','students'],['อนุมัติการสอน','ตรวจรายการที่ครูลงทะเบียนและคำขอแก้ไข ถ้าไม่ถูกต้องส่งกลับพร้อมข้อความ','reg'],['ติดตามความคืบหน้า','เลือกดูทีละชั้น หรือมุมมอง "รายครู" ว่าครูคนไหนส่งผลครบแล้ว','progress'],['จัดชุมนุม','สร้างชุมนุมและเลือกครูผู้สอนชุมนุม ระบบเตือนเมื่อนักเรียนอยู่หลายชุมนุม','acts'],['ลงนามและอนุมัติเล่ม','ในหน้าสมุด ปพ.5 ติ๊กลงนามของหัวหน้าฝ่ายต่าง ๆ และให้ ผอ. อนุมัติ พร้อมวันที่','p5'],['เผยแพร่ผลและประกาศ','เผยแพร่ผลการเรียนรายชั้นให้นักเรียนดูออนไลน์ และลงประกาศบนหน้าแรก','publish'],['ดาวน์โหลดเอกสาร','ดาวน์โหลด ปพ.5 ของแต่ละวิชาและเอกสารสรุป','p5']],
+ teacher:[['ลงทะเบียนวิชาที่สอน','กดเลือกชั้นทีละชั้น แล้วติ๊กวิชาที่สอน (วิชาของชั้นอื่นที่ติ๊กไว้ยังอยู่ ดูได้ในกล่อง "วิชาที่เลือกไว้ทั้งหมด") ส่งให้แอดมินอนุมัติทุกภาคเรียน · อนุมัติแล้วถ้าลงไม่ครบ กด "แก้ไขการลงทะเบียน" ขอเพิ่มได้','reg'],['รอการอนุมัติ','ถ้าแอดมินส่งกลับจะมีแจ้งเตือนและข้อความ ให้แก้แล้วส่งใหม่','reg'],['ตั้งช่องคะแนนเก็บ','ตั้งว่าเก็บกี่ช่อง ช่องละเท่าไร ประถมเลือกเก็บ 100 หรือ 50 ต่อภาคเรียน','scores'],['กรอกคะแนน','กรอกในตาราง หรือกด "ดาวน์โหลดแบบกรอกคะแนน (Excel)" ไปกรอกใน Excel / Google ชีต แล้ว "แนบไฟล์คะแนน" ระบบกรอกให้อัตโนมัติ · ชั่วโมงที่ขาดกรอกเฉพาะคนที่ขาด ผู้ที่เวลาเรียนต่ำกว่า 80% ได้ มส.','scores'],['เช็คชื่อรายวัน (ถ้าใช้)','เพิ่มวันเรียนต่อจากของเดิม หน้าละ 20 วัน กดเลขหน้าเพื่อดูวันก่อนหน้า','att'],['ตัดสินกิจกรรม','ชุมนุมเลือกสมาชิกของตน ส่วนลูกเสือและกิจกรรมเพื่อสังคมเป็นของครูที่ปรึกษา · ประถมตัดสินผลกิจกรรมในภาคเรียนที่ 2','acts'],['ประเมินผู้เรียน','ให้คะแนนคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะ รายข้อ ทีละคนหรือทั้งห้อง ระบบสรุปผลให้ (ประถมกรอกภาคเรียนที่ 2)','eval'],['ส่งผล','กรอกครบทุกคนแล้วกด "ส่งผล" ที่หน้าความคืบหน้า ถ้าต้องแก้ กด "ยกเลิกส่ง"','progress'],['ใบแจ้งผลและสรุปห้อง (ครูที่ปรึกษา)','เห็นเฉพาะห้องที่เป็นครูที่ปรึกษา ดาวน์โหลด PDF ใบแจ้งผลรายบุคคลหรือทั้งห้อง พร้อมลงนาม','report'],['สร้างลายเซ็น','วาดหรือแนบภาพลายเซ็น ระบบลบพื้นหลังให้ ใช้ลงชื่อในเล่ม ปพ.5 และใบแจ้งผล','sign'],['กรอกข้อมูลประกอบเล่ม','คำอธิบายรายวิชา มาตรฐาน/ตัวชี้วัดและเวลาของแต่ละหน่วย แล้วดูรายการตรวจความครบถ้วน','p5'],['ลงนามและดาวน์โหลด ปพ.5','กดลงลายมือชื่อครูผู้สอน ตรวจครบแล้วดาวน์โหลดเป็นหลักฐาน ระบบตั้งชื่อไฟล์ให้','p5']]};
 P.guide=()=>{const k=me().kind,NM={super:'แอดมินหลัก',admin:'แอดมินโรงเรียน',teacher:'ครูผู้สอน'}
  const tabs=k==='super'?['super','admin','teacher']:k==='admin'?['admin','teacher']:['teacher']
  const v=tabs.includes(S.guideKind)?S.guideKind:k, own=v===k, st=GUIDE[v]
@@ -508,7 +526,10 @@ P.guide=()=>{const k=me().kind,NM={super:'แอดมินหลัก',admin:
   <li>ครูที่ปรึกษา 2 คนในห้องเดียวกัน คนที่กรอกก่อนจะได้สิทธิ์ อีกคนจะได้รับแจ้งเตือน</li>
   <li>เล่ม ปพ.5 ลงนามและดาวน์โหลดไม่ได้จนกว่าจะประเมินคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะครบทุกคน (ประถมประเมินในภาคเรียนที่ 2)</li>
   <li>เวลาเรียนต่ำกว่า 80% ได้ มส. ระบบไม่ตัดเกรดให้ ประถมนับเวลาเรียนรวมทั้งปี</li>
-  <li>ลืมรหัสผ่านให้แจ้งแอดมินหลักหรือแอดมินโรงเรียนเพื่อรีเซ็ต</li></ul></div></div>`;};
+  <li>ลืมรหัสผ่านให้แจ้งแอดมินหลักหรือแอดมินโรงเรียนเพื่อรีเซ็ต</li>
+  <li>นักเรียนดูผลการเรียนที่ <b>${esc(location.origin)}/student</b> ด้วยเลขประจำตัวนักเรียน (คัดลอกลิงก์ได้ที่หน้าภาพรวม) · นักเรียนจำเลขประจำตัวไม่ได้ ให้ติดต่อครูประจำชั้น · ผลจะขึ้นเมื่อแอดมินกดเผยแพร่</li>
+  <li>ติดตั้งระบบเป็นแอปบนมือถือได้: กดปุ่ม "ติดตั้งแอป" บนหน้าแรก (iPhone: Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม)</li>
+  <li>เกรดคิดจากคะแนนรวมที่ปัดเป็นจำนวนเต็ม (.5 ขึ้นไปปัดขึ้น)</li></ul></div></div>`;};
 
 /* ---------- ลายเซ็นอิเล็กทรอนิกส์ ---------- */
 function sigWidget(target,label){const cur=getSig(target);
@@ -642,10 +663,11 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  <div class="rpss">${sg(sigT,hr.length?USERS[hr[0]].name:'','ครูที่ปรึกษา')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
  <div class="small">${note}คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน · ${crW} 1.0 = 40 ชั่วโมง${pri?'ต่อปี':'ต่อภาคเรียน'}</div></div>`;}
 
-P.report=()=>{const L=LEVELS.includes(S.rpLevel)?S.rpLevel:'ป.3',D=rptData(L),T=D.T,s=D.stus.find(x=>x.id===S.rpStu)||D.stus[0],st=S.rpt[L]||(S.rpt[L]={});
+P.report=()=>{const RL=sumLevels();if(!RL.length)return '<div class="card empty">ใบแจ้งผลการเรียนพิมพ์ได้เฉพาะครูที่ปรึกษาประจำชั้น (แอดมินกำหนดครูที่ปรึกษาที่หน้า "ตั้งค่าโรงเรียน")</div>';
+ const L=RL.includes(S.rpLevel)?S.rpLevel:RL[0],D=rptData(L),T=D.T,s=D.stus.find(x=>x.id===S.rpStu)||D.stus[0],st=S.rpt[L]||(S.rpt[L]={});
  const ttl={p1:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 1',p2:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 2 (ผลทั้งปี)',s:`ใบแจ้งผลการเรียน มัธยม ภาคเรียนที่ ${T}`}[D.mode];
  const dsc={p1:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4 (แบบเดียวกับมัธยม): แจ้งคะแนนภาคเรียนที่ 1 เต็มวิชาละ 50 ยังไม่ตัดเกรด การประเมินและกิจกรรมแจ้งในภาคเรียนที่ 2',p2:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4 (แบบเดียวกับมัธยม): ผลการเรียนทั้งปี น้ำหนัก ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรม และ GPA',s:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4: หน่วยกิต ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรมพัฒนาผู้เรียน สรุปหน่วยกิตและ GPA'}[D.mode];
- return `<div class="stack"><div class="row">${LEVELS.map(l=>`<button class="chip" aria-pressed="${l===L}" data-rl="${l}">${l}</button>`).join('')}</div>
+ return `<div class="stack"><div class="row">${RL.map(l=>`<button class="chip" aria-pressed="${l===L}" data-rl="${l}">${l}</button>`).join('')}</div>
  <div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${S.term===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>
  <div class="card stack"><h3>${ttl}</h3><div class="small muted">${dsc}</div>
  ${D.stus.length?`<div class="row"><label for="rpst">นักเรียน</label><select id="rpst">${D.stus.map(x=>`<option value="${x.id}" ${x.id===s.id?'selected':''}>${x.no}. ${esc(x.name)}</option>`).join('')}</select></div>
@@ -733,6 +755,45 @@ reg('click',e=>{const t=e.target.closest('[data-pub],[data-unpub],[data-pubopt],
  if(d.pub)pubLevel(d.pub);else if(d.unpub)unpubLevel(d.unpub);else if(d.pubopt)pubSetOpt(d.pubopt,d.v==='1');
  else if(d.act==='pubcopy'){try{navigator.clipboard.writeText(location.origin+'/student');toast('คัดลอกลิงก์แล้ว');}catch(err){toast(location.origin+'/student');}}});
 reg('change',e=>{const t=e.target;if(t.dataset&&t.dataset.pubchk)pubSetOpt(t.dataset.pubchk,t.checked);});
+// ===== กรอกคะแนนผ่าน Excel / Google ชีต: ดาวน์โหลดแบบฟอร์ม → กรอก → แนบกลับ ระบบกรอกให้อัตโนมัติ =====
+function scoreTplRows(code){const c=CAT.find(x=>x.code===code),cfg=cfgOf(code),F=fulls(code),H=cfg.hours,R=calc(code),useAb=!attHas(code,S.term);
+ const head=['รหัสระบบ (ห้ามแก้)','เลขที่','เลขประจำตัว','ชื่อ-สกุล',...cfg.cols.map(k=>`${k.n} (เต็ม ${k.max})`),`ปลายภาค (เต็ม ${F.fin})`,...(useAb?[`ชั่วโมงที่ขาด (เต็ม ${H})`]:[])];
+ const nv=x=>x===''||x==null?'':+x;
+ const rows=R.map(r=>[r.s.id,r.s.no,r.s.sid||'',r.s.name,...cfg.cols.map((k,i)=>nv(r.v.c[i])),nv(r.v.f),...(useAb?[r.a[S.term]>0?r.a[S.term]:'']:[])]);
+ return {c,cfg,F,H,useAb,head,rows};}
+function scoreTplDownload(){const code=S.scCode;if(!code)return;const X=scoreTplRows(code),c=X.c;
+ const title=`แบบกรอกคะแนน ${c.code} ${c.name} ${c.level} ${isPri(c.level)?'ภาคเรียนที่ '+S.term+' ':'ภาคเรียนที่ '+S.term+' '}ปีการศึกษา ${S.year}`;
+ const note='กรอกเฉพาะคอลัมน์คะแนน (ตั้งแต่คอลัมน์ E) · ห้ามแก้คอลัมน์ รหัสระบบ เลขที่ ชื่อ · ช่องที่เว้นว่าง ระบบจะไม่เปลี่ยนคะแนนเดิม';
+ saveFile(`แบบกรอกคะแนน_${c.code}_${c.level}_ภาค${S.term}_${S.year}.xlsx`,buildXlsx([{name:c.code,head:3,widths:[22,7,13,30,...X.head.slice(4).map(()=>18)],rows:[[title],[note],X.head,...X.rows]}]));
+ toast('ดาวน์โหลดแบบกรอกคะแนนแล้ว');}
+async function scoreImport(file){const code=S.scCode;if(!code||!file)return;
+ if(S.sub[SUBK(code,S.term)]&&!isAdmin())return toast('วิชานี้ส่งผลแล้ว กด “ยกเลิกส่ง” ก่อนนำเข้าคะแนน');
+ let T;try{T=await readTable(file);}catch(e){return tell({title:'อ่านไฟล์ไม่ได้',text:'รองรับไฟล์ .xlsx (Excel / Google ชีต: ไฟล์ → ดาวน์โหลด → Microsoft Excel) และ .csv\n\n'+(e.message||e),tone:'warn'});}
+ const X=scoreTplRows(code),hi=T.findIndex(r=>String(r[0]||'').startsWith('รหัสระบบ'));
+ if(hi<0)return tell({title:'ไม่ใช่แบบกรอกคะแนนของระบบ',text:'ไม่พบหัวคอลัมน์ “รหัสระบบ” ให้ดาวน์โหลดแบบกรอกคะแนนจากหน้านี้ แล้วกรอกในไฟล์นั้น',tone:'warn'});
+ const H0=T[hi].map(x=>String(x||'').trim());
+ if(T.slice(0,hi).some(r=>String(r[0]||'').includes('แบบกรอกคะแนน')&&!String(r[0]).includes(code)))return tell({title:'ไฟล์เป็นของวิชาอื่น',text:`ไฟล์นี้ไม่ใช่แบบกรอกคะแนนของ ${code} ตรวจว่าเลือกวิชาถูกต้อง`,tone:'warn'});
+ if(H0.length<X.head.length||X.head.some((h,i)=>H0[i]!==h))return tell({title:'ช่องคะแนนไม่ตรงกับที่ตั้งไว้ตอนนี้',text:'ช่องคะแนนเก็บหรือคะแนนเต็มถูกเปลี่ยนหลังดาวน์โหลดแบบฟอร์ม ให้ดาวน์โหลดแบบกรอกคะแนนใหม่แล้วกรอกอีกครั้ง',tone:'warn'});
+ const sk=TK(code),ids=new Set(X.rows.map(r=>r[0])),err=[];let n=0,stu=0;const nc=X.cfg.cols.length;
+ const maxOf=i=>i<nc?+X.cfg.cols[i].max:i===nc?X.F.fin:X.H;
+ T.slice(hi+1).forEach((r,ri)=>{const id=String(r[0]||'').trim();if(!id)return;if(!ids.has(id)){err.push(`แถว ${hi+ri+2}: ไม่พบนักเรียน (รหัสระบบถูกแก้หรือไม่ใช่ห้องนี้)`);return;}
+  const row=(S.scores[sk]=S.scores[sk]||{})[id]||(S.scores[sk][id]={c:[],f:''});let touched=false;
+  for(let i=0;i<nc+1+(X.useAb?1:0);i++){const raw=r[4+i];if(raw===''||raw==null)continue;const v=+String(raw).replace(',','.');
+   if(isNaN(v)||v<0||v>maxOf(i)){err.push(`${r[3]||id}: ${X.head[4+i]} ค่า “${raw}” ไม่ถูกต้อง (0–${maxOf(i)})`);continue;}
+   if(i<nc)row.c[i]=v;else if(i===nc)row.f=v;else{const a=(S.ab[code]=S.ab[code]||{});(a[id]=a[id]||{})[S.term]=v;}n++;touched=true;}
+  if(touched)stu++;});
+ render();
+ tell({title:err.length?`นำเข้าแล้ว แต่มีข้อผิดพลาด ${err.length} รายการ`:'นำเข้าคะแนนเรียบร้อย',text:`กรอกคะแนนให้ ${stu} คน รวม ${n} ช่อง${err.length?'\n\nช่องที่ข้าม (คะแนนเดิมไม่เปลี่ยน):\n'+err.slice(0,15).join('\n')+(err.length>15?`\n… และอีก ${err.length-15} รายการ`:''):''}\n\nตรวจคะแนนในตาราง แล้วกด “ส่งผล” ตามปกติ`,tone:err.length?'warn':'ok'});}
+function scoreXlCard(){return `<div class="card stack"><h3>กรอกคะแนนผ่าน Excel / Google ชีต</h3>
+ <ol class="small" style="margin:0;padding-left:20px;display:grid;gap:4px">
+ <li>กด <b>ดาวน์โหลดแบบกรอกคะแนน</b> ไฟล์มีรายชื่อนักเรียนและช่องคะแนนตามที่ตั้งไว้ด้านบน (ตั้งช่องคะแนนเก็บให้เสร็จก่อนดาวน์โหลด)</li>
+ <li>เปิดด้วย <b>Excel</b> หรืออัปโหลดเข้า <b>Google Drive</b> แล้วเปิดด้วย Google ชีต</li>
+ <li>กรอกคะแนนตั้งแต่คอลัมน์ E เป็นต้นไป · <b>ห้ามแก้</b> คอลัมน์รหัสระบบ เลขที่ และชื่อ · ช่องที่เว้นว่างระบบจะไม่เปลี่ยนคะแนนเดิม</li>
+ <li>บันทึกเป็น <b>.xlsx</b> (Google ชีต: ไฟล์ → ดาวน์โหลด → Microsoft Excel (.xlsx) หรือ .csv)</li>
+ <li>กด <b>แนบไฟล์คะแนน</b> ระบบกรอกให้อัตโนมัติ ตรวจคะแนนเต็มให้ และบอกช่องที่ผิด จากนั้นตรวจในตารางแล้วกด <b>ส่งผล</b> ตามปกติ</li></ol>
+ <div class="row"><button class="btn sm" data-act="xltpl">ดาวน์โหลดแบบกรอกคะแนน (Excel)</button><label class="btn sm alt" style="cursor:pointer">แนบไฟล์คะแนน (.xlsx / .csv)<input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-xlimp hidden></label></div></div>`;}
+reg('click',e=>{const t=e.target.closest('[data-act=xltpl]');if(t&&$('#view')&&$('#view').contains(t))scoreTplDownload();});
+reg('change',e=>{const t=e.target;if(t.dataset&&t.dataset.xlimp!==undefined&&t.files&&t.files[0]){const f=t.files[0];t.value='';scoreImport(f);}});
 const PRI_L=['ป.1','ป.2','ป.3','ป.4','ป.5','ป.6'];
 reg('click',e=>{const t=e.target.closest('[data-rl],[data-act=rdl]');if(!t)return;const d=t.dataset;
  if(d.rl){S.rpLevel=d.rl;S.rpStu=null;render();}
@@ -993,7 +1054,7 @@ reg('click', (e) => {
     const v = $('#attd').value; if (!v) return toast('เลือกวันที่ก่อน')
     const n = attAddDays([v], h); S.attH = h
     const nx = new Date(v + 'T00:00:00'); do nx.setDate(nx.getDate() + 1); while (nx.getDay() === 0 || nx.getDay() === 6)
-    S.attLast = isoD(nx); toast(n ? 'เพิ่มวันเรียนแล้ว' : 'มีวันนี้อยู่แล้ว'); attRender()
+    S.attLast = isoD(nx); S.attPg = null; toast(n ? 'เพิ่มวันเรียนแล้ว' : 'มีวันนี้อยู่แล้ว'); attRender()
   } else if (a === 'range') {
     const f = $('#attf').value, e2 = $('#attt').value; if (!f || !e2 || e2 < f) return toast('เลือกวันเริ่มและวันสิ้นสุดให้ถูกต้อง')
     const we = $('#attwe').checked, list = [], d = new Date(f + 'T00:00:00'), end = new Date(e2 + 'T00:00:00')
@@ -1009,7 +1070,9 @@ reg('click', (e) => {
     const sel = new Set(S.attD); A.days.forEach((x) => { if (sel.has(x.d)) delete x.x }); S.attD = []; toast('ยกเลิกวันหยุดแล้ว กลับเป็นวันเรียน'); attRender()
   } else if (a === 'gen') { attGen($('#genf').value, $('#gent').value)
   } else if (a === 'wkprev' || a === 'wknext') {
-    const ws = attWeeks(A.days), i = ws.findIndex((w) => w[0] === S.attWk), n = ws[i + (a === 'wkprev' ? -1 : 1)]; if (n) { S.attWk = n[0]; attRender() }
+    S.attPg = Math.max(0, (S.attPg || 0) + (a === 'wkprev' ? -1 : 1)); attRender()
+  } else if (a === 'pg') {
+    S.attPg = +d.p; attRender()
   } else if (a === 'apply') {
     const st = $('#atss').value, ss = S.attS.length ? S.attS : null, dd = S.attD.length ? S.attD : null
     if (!ss && !dd) return toast('ติ๊กนักเรียน หรือหัวคอลัมน์วันที่ ที่ต้องการก่อน')

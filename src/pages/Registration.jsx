@@ -142,6 +142,7 @@ function TeacherView({ regs, all }) {
   const startFrom = (m) => {
     const codes = m ? (m.reqCodes || m.codes) : []
     setPicked(new Set(codes))
+    setViewLv((v) => v || catalog.find((x) => x.code === codes[0])?.level || null)
     setLevels(new Set(codes.map((c) => catalog.find((x) => x.code === c)?.level).filter(Boolean)))
   }
   useEffect(() => {
@@ -154,7 +155,11 @@ function TeacherView({ regs, all }) {
     setPicked(new Set(mine ? mine.codes : []))
     setLevels(new Set(mine ? mine.codes.map((c) => catalog.find((x) => x.code === c)?.level).filter(Boolean) : []))
   }, [term, openYear?.year])
-  const subj = useMemo(() => termCatalog.filter((c) => levels.has(c.level) && openSet.has(c.code)), [termCatalog, levels, openSet])
+  // แสดงทีละชั้น (ไม่รวมหลายชั้นในตารางเดียว) วิชาที่ติ๊กไว้ในชั้นอื่นยังอยู่ครบ
+  const [viewLv, setViewLv] = useState(() => (mine && mine.codes.length ? catalog.find((x) => x.code === mine.codes[0])?.level : null) || null)
+  const lvOf = (code) => catalog.find((x) => x.code === code)?.level
+  const pickedBy = (l) => [...picked].filter((code) => lvOf(code) === l).length
+  const subj = useMemo(() => termCatalog.filter((c) => c.level === viewLv && openSet.has(c.code)), [termCatalog, viewLv, openSet])
   // เปลี่ยนชั้น: ชั้นที่เอาออก → ล้างวิชาที่เคยติ๊กไว้ของชั้นนั้นด้วย
   const toggleLevel = (l) => {
     const n = new Set(levels)
@@ -165,7 +170,10 @@ function TeacherView({ regs, all }) {
     setLevels(n)
   }
   const togglePick = useCallback((code) => setPicked((p) => { const n = new Set(p); n.has(code) ? n.delete(code) : n.add(code); return n }), [])
-  const clearAll = () => { setLevels(new Set()); setPicked(new Set()) }
+  const clearAll = async () => {
+    if (picked.size && !(await ask({ title: 'ล้างวิชาที่เลือกทั้งหมด?', text: `เอาติ๊กออกทั้ง ${picked.size} วิชา (ยังไม่บันทึกจนกว่าจะกดปุ่มบันทึก)`, ok: 'ล้างทั้งหมด', cancel: 'ไม่ล้าง', danger: true }))) return
+    setLevels(new Set()); setPicked(new Set())
+  }
   const approved = !admin && mine?.status === 'ok'
   const locked = approved && !editing
 
@@ -188,6 +196,10 @@ function TeacherView({ regs, all }) {
   }
 
   const submit = async () => {
+    // กันเผลอเอาติ๊กวิชาที่บันทึกไว้แล้วออก: ถามยืนยันก่อนบันทึกเสมอ
+    const saved = mine ? (mine.reqCodes || mine.codes) : []
+    const removed = saved.filter((code) => !picked.has(code))
+    if (removed.length && !(await ask({ title: `เอาวิชาออก ${removed.length} วิชา?`, text: removed.map((code) => { const x = catalog.find((y) => y.code === code); return x ? `${x.level} ${code} ${x.name}` : code }).join('\n') + '\n\nถ้าไม่ได้ตั้งใจเอาออก กด "ไม่ใช่" แล้วติ๊กกลับ', ok: 'ใช่ เอาออก', cancel: 'ไม่ใช่', danger: true }))) return
     const codes = [...picked].filter((code) => levels.has(catalog.find((x) => x.code === code)?.level))
     if (!codes.length) return tell({ title: 'ยังไม่ได้เลือกวิชา', text: 'เลือกวิชาที่สอนอย่างน้อย 1 วิชา', tone: 'warn' })
     const dup = codes.filter((code) => takenMap[code] && !(mine?.codes || []).includes(code))
@@ -236,18 +248,29 @@ function TeacherView({ regs, all }) {
       {locked ? null : (
         <div className="card stack">
           {approved && <div className="row" style={{ justifyContent: 'space-between' }}><b>แก้ไขการลงทะเบียน</b><button className="btn sm alt" onClick={() => { startFrom(mine); setEditing(false) }}>ปิด ไม่แก้ไข</button></div>}
-          <h3>1. เลือกชั้นที่สอน (เลือกได้หลายชั้น)</h3>
+          <h3>1. เลือกชั้น (ดูทีละชั้น วิชาที่ติ๊กไว้ในชั้นอื่นยังอยู่)</h3>
           <div className="row">
-            {LEVELS.map((l) => <button key={l} className="chip" aria-pressed={levels.has(l)} onClick={() => toggleLevel(l)}>{l}</button>)}
-            {(levels.size > 0 || picked.size > 0) && <button className="btn sm alt" onClick={clearAll}>ล้างที่เลือกทั้งหมด</button>}
+            {LEVELS.map((l) => { const n = pickedBy(l); return <button key={l} className={`chip${n ? ' has' : ''}`} aria-pressed={viewLv === l} onClick={() => setViewLv(l)}>{l}{n ? ` · ${n}` : ''}</button> })}
+            {picked.size > 0 && <button className="btn sm alt" onClick={clearAll}>ล้างที่เลือกทั้งหมด</button>}
           </div>
-          <h3>2. เลือกวิชา</h3>
+          {picked.size > 0 && (
+            <div className="lock stack" style={{ gap: 6 }}>
+              <b className="small">วิชาที่เลือกไว้ทั้งหมด {picked.size} วิชา</b>
+              <div className="row" style={{ gap: 6 }}>
+                {[...picked].map((code) => ({ code, x: catalog.find((y) => y.code === code) })).sort((a, b) => (a.x?.level || '').localeCompare(b.x?.level || '', 'th') || a.code.localeCompare(b.code)).map(({ code, x }) => (
+                  <span key={code} className="pill p-gold" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>{x ? `${x.level} ${code} ${x.name}` : code}
+                    <button type="button" className="xbtn" aria-label={`เอา ${code} ออก`} onClick={() => togglePick(code)}>×</button></span>
+                ))}
+              </div>
+            </div>
+          )}
+          <h3>2. เลือกวิชา{viewLv ? ` ชั้น ${viewLv}` : ''}</h3>
           <div className="tw regtw">
             <table>
               <thead><tr><th></th><th>ชั้น</th><th>รหัส</th><th>รายวิชา</th></tr></thead>
               <tbody>
                 {subj.map((c) => <Row key={c.code} c={c} on={picked.has(c.code)} onToggle={togglePick} taken={takenMap[c.code]} />)}
-                {!subj.length && <tr><td colSpan={4} className="empty">เลือกชั้นก่อน (แสดงเฉพาะวิชาที่แอดมินเปิดสอนแล้ว)</td></tr>}
+                {!subj.length && <tr><td colSpan={4} className="empty">{viewLv ? `ชั้น ${viewLv} ยังไม่มีวิชาที่เปิดสอนในภาคเรียนนี้` : 'เลือกชั้นก่อน (แสดงเฉพาะวิชาที่แอดมินเปิดสอนแล้ว)'}</td></tr>}
               </tbody>
             </table>
           </div>
