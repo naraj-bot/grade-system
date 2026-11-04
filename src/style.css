@@ -456,3 +456,72 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 
 .sigln{display:inline-block;position:relative;width:150px;height:1em;margin-top:30px;border-bottom:1px dotted #555;vertical-align:baseline}.sigln .sigimg{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);height:38px;max-width:150px;object-fit:contain;mix-blend-mode:multiply}
 .sigimg{mix-blend-mode:multiply}
+
+/* การ์ดประกาศผลบนหน้าแรก: โทนกลาง เส้นบาง ตัวอักษรเป็นลำดับชั้น */
+.ld-card{gap:0;padding:8px 28px;border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,.35)}
+.ld-sec{padding:22px 0;display:grid;gap:14px}.ld-sec+.ld-sec{border-top:1px solid #ece4df}
+.ld-eyebrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.ld-eyebrow span{font:700 13px var(--f-display);letter-spacing:.08em;color:#8c1c1c}
+.ld-eyebrow em{font-style:normal;font-size:13px;color:#7a6a66;white-space:nowrap}
+.ld-lv{display:grid;gap:8px}
+.ld-lvhd{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ld-lvhd b{display:block;font:700 18px/1.2 var(--f-display);color:#1f1414}
+.ld-lvhd span{font-size:13px;color:#7a6a66}
+.ld-st{display:inline-flex;align-items:center;gap:8px;font-size:14px!important;font-weight:600;white-space:nowrap}
+.ld-st i{width:8px;height:8px;border-radius:50%;background:#c5b8b3}
+.ld-st.on{color:#1f6b44!important}.ld-st.on i{background:#22a06b;box-shadow:0 0 0 4px rgba(34,160,107,.15)}
+.ld-st.part{color:#8a5a00!important}.ld-st.part i{background:#d99a1e}
+.ld-st.off{color:#7a6a66!important}
+.ld-bar{height:4px;border-radius:4px;background:#f0e9e5;overflow:hidden}.ld-bar i{display:block;height:100%;background:#22a06b;border-radius:4px}
+.ld-news{border-top:0;padding:0}.ld-news+.ld-news{border-top:1px solid #f2ebe7;padding-top:14px}
+.ld-date{width:44px;border-right:1px solid #ece4df;padding-right:12px;margin-right:2px}
+.ld-date b{color:#1f1414}
+.ld-none{font-size:14px;color:#7a6a66}
+.ld-bar.part i{background:#d99a1e}
+/* การ์ดกลืนกับพื้นหลัง: กระจกฝ้าโทนเดียวกับหน้า แทนกล่องขาว */
+.ld-card{background:rgba(255,255,255,.055);color:#fbeee9;border:1px solid rgba(255,255,255,.13);box-shadow:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.ld-sec+.ld-sec{border-top-color:rgba(255,255,255,.12)}
+.ld-eyebrow span{color:#f3d27a}.ld-eyebrow em{color:#d9bdb4}
+.ld-lvhd b{color:#fff}.ld-lvhd span{color:#d9bdb4}
+.ld-st.off{color:#d9bdb4!important}.ld-st i{background:#a8908a}
+.ld-st.on{color:#7fe0b0!important}.ld-st.on i{background:#3ccf8e;box-shadow:0 0 0 4px rgba(60,207,142,.18)}
+.ld-st.part{color:#f3d27a!important}.ld-st.part i{background:#f3d27a}
+.ld-bar{background:rgba(255,255,255,.1)}.ld-bar i{background:#3ccf8e}.ld-bar.part i{background:#f3d27a}
+.ld-news+.ld-news{border-top-color:rgba(255,255,255,.1)}
+.ld-date{border-right-color:rgba(255,255,255,.14)}.ld-date b{color:#fff}.ld-date span{color:#d9bdb4}
+.ld-title{color:#fff}.ld-by{color:#d9bdb4}.ld-none{color:#d9bdb4}
+.ld-tag{background:rgba(243,210,122,.16);color:#f3d27a}.ld-tag.t-new{background:rgba(60,207,142,.16);color:#7fe0b0}.ld-tag.t-imp{background:rgba(255,120,110,.16);color:#ffb3ab}.ld-tag.t-urg{background:rgba(255,170,90,.16);color:#ffc98f}
+
+/* ===== หน้าแรก: ลุคทันสมัย ===== */
+.ld{background:#3a0b0b}
+.ld-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ld-bg i{position:absolute;border-radius:50%;filter:blur(80px);opacity:.55}
+.ld-bg .g1{width:620px;height:620px;left:-160px;top:-220px;background:radial-gradient(circle,#9b2424,transparent 70%)}
+.ld-bg .g2{width:520px;height:520px;right:-120px;top:18%;background:radial-gradient(circle,#c0582e,transparent 70%);opacity:.35}
+.ld-bg .g3{width:560px;height:560px;left:35%;bottom:-320px;background:radial-gradient(circle,#f3d27a,transparent 70%);opacity:.14}
+.ld-bg::after{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1px);background-size:26px 26px;-webkit-mask-image:radial-gradient(ellipse at 30% 40%,#000 20%,transparent 70%);mask-image:radial-gradient(ellipse at 30% 40%,#000 20%,transparent 70%)}
+.ld-top,.ld-main,.ld-foot{z-index:1}
+.ld-top{border-bottom-color:rgba(255,255,255,.08);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.ld-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(243,210,122,.08)}
+.ld-badge i{width:7px;height:7px;border-radius:50%;background:#f3d27a;box-shadow:0 0 0 0 rgba(243,210,122,.6);animation:ldPulse 2.2s infinite}
+.ld-hero h1{letter-spacing:-.01em}
+.ld-grad{background:linear-gradient(100deg,#ffe7a3 0%,#f3d27a 40%,#e7a54c 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ld-cta{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#ffe39a,#f0c35f);box-shadow:0 10px 30px rgba(240,195,95,.28),inset 0 1px 0 rgba(255,255,255,.6);transition:transform .18s,box-shadow .18s}
+.ld-cta svg{transition:transform .18s}
+.ld-cta:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(240,195,95,.38),inset 0 1px 0 rgba(255,255,255,.6)}
+.ld-cta:hover svg{transform:translateX(3px)}
+.ld-teach{transition:background .18s,border-color .18s}.ld-teach:hover{border-color:#fff}
+.ld-steps>div{background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.1);transition:border-color .18s,background .18s}
+.ld-steps>div:hover{background:rgba(255,255,255,.08);border-color:rgba(243,210,122,.35)}
+.ld-card{position:relative;background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.03));border-color:rgba(255,255,255,.14);box-shadow:0 30px 80px rgba(0,0,0,.28)}
+.ld-card::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(160deg,rgba(243,210,122,.5),transparent 35%,transparent 70%,rgba(255,255,255,.18));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.ld-news{border-radius:12px;transition:background .15s}
+.ld-wm{opacity:.045}
+@keyframes ldPulse{0%{box-shadow:0 0 0 0 rgba(243,210,122,.55)}70%{box-shadow:0 0 0 9px rgba(243,210,122,0)}100%{box-shadow:0 0 0 0 rgba(243,210,122,0)}}
+@keyframes ldUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.ld-hero>*{animation:ldUp .6s cubic-bezier(.2,.7,.2,1) both}
+.ld-hero>*:nth-child(2){animation-delay:.06s}.ld-hero>*:nth-child(3){animation-delay:.12s}.ld-hero>*:nth-child(4){animation-delay:.18s}.ld-hero>*:nth-child(5){animation-delay:.24s}
+.ld-card{animation:ldUp .7s .15s cubic-bezier(.2,.7,.2,1) both}
+@media (prefers-reduced-motion:reduce){.ld-hero>*,.ld-card,.ld-badge i{animation:none}.ld-cta,.ld-cta svg{transition:none}}
+/* เติมบรรทัดแรกให้เต็มก่อน: ตัดบรรทัดตามปกติ ส่วนการกันคำตกใช้การจับวลี (phrases) แทน */
+.ld-title{text-wrap:wrap}

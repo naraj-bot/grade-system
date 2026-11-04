@@ -9,6 +9,19 @@ import { StudentKeypad, saveStu } from './StudentPortal'
 const OFFICE = 'สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสิงห์บุรี'
 const TAG = { 'ใหม่': 't-new', 'สำคัญ': 't-imp', 'ด่วน': 't-urg' }
 const LV_PRI = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6'], LV_SEC = ['ม.1', 'ม.2', 'ม.3']
+// ตัดหัวข้อประกาศเป็นวลี ไม่ให้คำตกบรรทัดเดี่ยว ๆ: ตัวเลข/ระดับชั้น/ขีด ติดกับคำก่อนหน้า, คำเชื่อม (ชั้น ภาคเรียนที่ หรือ ฯลฯ) ติดกับคำถัดไป
+const JOIN_NEXT = ['ชั้น', 'ภาคเรียนที่', 'ภาคเรียน', 'ปีการศึกษา', 'หรือ', 'และ', 'ถึง', 'วันที่', 'เวลา']
+const JOIN_PREV = ['หรือ', 'และ', 'ถึง', '–', '-']
+export function phrases(t) {
+  const out = []
+  String(t || '').split(/\s+/).filter(Boolean).forEach((x) => {
+    const prev = out[out.length - 1], last = prev && prev.split('\u00a0').pop()
+    const stick = prev && (/^[0-9๐-๙(]/.test(x) || /^[มปอ]\.\d/.test(x) || x.length <= 2 || JOIN_PREV.includes(x) || JOIN_PREV.includes(last) || JOIN_NEXT.includes(last) || /,$/.test(last))
+    if (stick) out[out.length - 1] = prev + '\u00a0' + x; else out.push(x)
+  })
+  return out
+}
+const Title = ({ t }) => <>{phrases(t).map((p, i) => (p.includes('\u00a0') && p.length <= 30 ? <span key={i} className="nw">{p}</span> : <span key={i}>{p} </span>))}</>
 const day = (t) => new Date(t).toLocaleDateString('th-TH', { day: 'numeric' })
 const mon = (t) => new Date(t).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' })
 
@@ -63,6 +76,7 @@ export default function Landing() {
   const stuDone = (data, sid) => { saveStu({ sid, data }); nav('/student') }
   return (
     <section className="ld">
+      <div className="ld-bg" aria-hidden="true"><i className="g1" /><i className="g2" /><i className="g3" /></div>
       <img className="ld-wm" src="/logo.png" alt="" aria-hidden="true" />
       <header className="ld-top">
         <div className="ld-brand">
@@ -73,38 +87,45 @@ export default function Landing() {
       </header>
       <main className="ld-main">
         <div className="ld-hero">
-          <span className="ld-badge">สำหรับนักเรียนและผู้ปกครอง</span>
-          <h1>ระบบผลการเรียน</h1>
+          <span className="ld-badge"><i aria-hidden="true" />สำหรับนักเรียนและผู้ปกครอง</span>
+          <h1>ระบบ<span className="ld-grad">ผลการเรียน</span></h1>
           <p><span className="nw">ติดตามผลการเรียนได้ทุกที่ ทุกเวลา</span><span className="nw">ดูเกรด GPA</span><span className="nw">และดาวน์โหลดใบแจ้งผลการเรียน</span><span className="nw">ได้ทันทีเมื่อโรงเรียนประกาศผล</span></p>
-          <div className="ld-ctas"><button type="button" className="ld-cta" onClick={openStudent}>นักเรียนดูผลการเรียน</button><span className="ld-hint">ใช้เลขประจำตัวนักเรียน ไม่ต้องสมัครสมาชิก</span></div>
+          <div className="ld-ctas"><button type="button" className="ld-cta" onClick={openStudent}>นักเรียนดูผลการเรียน<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg></button><span className="ld-hint">ใช้เลขประจำตัวนักเรียน ไม่ต้องสมัครสมาชิก</span></div>
           <div className="ld-steps" aria-label="ขั้นตอนดูผลการเรียน">
             <div><b>1</b>กรอกเลขประจำตัว</div><div><b>2</b>ดูเกรดและ GPA</div><div><b>3</b>ดาวน์โหลดใบแจ้งผล</div>
           </div>
         </div>
-        <div className="ld-card">
-          {(
-            <div className="ld-status">
-              <span className="small">{pub ? `สถานะประกาศผล · ภาคเรียนที่ ${pub.term}/${pub.year}` : 'สถานะประกาศผล'}</span>
-              {(pub ? pub.rows : [{ label: 'ม.1 – ม.3', done: 0, all: 3 }, { label: 'ป.1 – ป.6', done: 0, all: 6 }]).map((r) => (
-                <div key={r.label}><b>{r.label}</b>
-                  <span className={`pill ${r.done === r.all ? 'p-good' : r.done ? 'p-gold' : 'p-bad'}`}>{r.done === r.all ? '✓ ประกาศผลแล้ว' : r.done ? `ประกาศแล้ว ${r.done} ชั้น` : 'รอประกาศ'}</span>
+        <aside className="ld-card" aria-label="ประกาศผลและข่าวประกาศ">
+          <div className="ld-sec">
+            <div className="ld-eyebrow"><span>ประกาศผลการเรียน</span>{pub && <em>ภาคเรียนที่ {pub.term}/{pub.year}</em>}</div>
+            {(pub ? pub.rows : [{ label: 'ม.1 – ม.3', done: 0, all: 3 }, { label: 'ป.1 – ป.6', done: 0, all: 6 }]).map((r) => {
+              const st = r.done === r.all ? 'on' : r.done ? 'part' : 'off'
+              return (
+                <div className="ld-lv" key={r.label}>
+                  <div className="ld-lvhd">
+                    <div><b>{r.label}</b><span>{r.label.startsWith('ม') ? 'มัธยมศึกษาตอนต้น' : 'ประถมศึกษา'}</span></div>
+                    <span className={`ld-st ${st}`}><i aria-hidden="true" />{st === 'on' ? 'ประกาศผลแล้ว' : st === 'part' ? `ประกาศแล้ว ${r.done}/${r.all} ชั้น` : 'รอประกาศ'}</span>
+                  </div>
+                  <div className={`ld-bar ${st}`} role="img" aria-label={`ประกาศแล้ว ${r.done} จาก ${r.all} ชั้น`}><i style={{ width: `${(r.done / r.all) * 100}%` }} /></div>
                 </div>
-              ))}
-            </div>
-          )}
-          <b className="ld-h">ประกาศล่าสุด</b>
-          {news === null ? <div className="small muted">กำลังโหลด…</div> : !news.length ? (
-            <div className="ld-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg><span>ยังไม่มีประกาศจากโรงเรียน เมื่อมีประกาศใหม่จะแสดงที่นี่</span></div>
-          ) : news.map((n) => (
-            <div className="ld-news" key={n.id}>
-              <div className="ld-date"><b>{day(n.at)}</b><span>{mon(n.at)}</span></div>
-              <div>
-                <div className="ld-title">{String(n.title).replace(/ – /g, '\u00a0–\u00a0')}</div>
-                <div className="ld-by">{n.tag && <span className={`ld-tag ${TAG[n.tag] || ''}`}>{n.tag}</span>}<span>{n.by}</span></div>
+              )
+            })}
+          </div>
+          <div className="ld-sec">
+            <div className="ld-eyebrow"><span>ข่าวประกาศ</span></div>
+            {news === null ? <div className="ld-none">กำลังโหลด…</div> : !news.length ? (
+              <div className="ld-none">ยังไม่มีประกาศจากโรงเรียน</div>
+            ) : news.map((n) => (
+              <div className="ld-news" key={n.id}>
+                <div className="ld-date"><b>{day(n.at)}</b><span>{mon(n.at)}</span></div>
+                <div>
+                  <div className="ld-title"><Title t={n.title} /></div>
+                  <div className="ld-by">{n.tag && <span className={`ld-tag ${TAG[n.tag] || ''}`}>{n.tag}</span>}<span>{n.by}</span></div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </aside>
       </main>
       <footer className="ld-foot"><span>© {new Date().getFullYear() + 543} ระบบบันทึกและประกาศผลการเรียน โรงเรียนวัดบางปูน</span><span>พัฒนาโดย ครูซอสสอนสังคม</span></footer>
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
