@@ -574,3 +574,10 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .sp-dl{display:grid;gap:10px}
 .sp-img{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;border-radius:18px;border:2px solid #8c1c1c;background:#fff;color:#8c1c1c;font:600 18px var(--f-display);cursor:pointer}
 .sp-img:disabled{opacity:.6;cursor:default}
+.sp-stats .gpa small{font-size:12px;color:#7a6a66}
+.sp-g.sc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:1}
+.sp-g.sc b{font:700 22px var(--f-display)}.sp-g.sc small{font:500 12px var(--f-body);color:var(--muted);margin-top:2px}
+.sp-bar{display:flex;align-items:center;gap:10px;margin-top:6px}
+.sp-bar .tr{flex:1;height:6px;border-radius:6px;background:#f1e6e0;overflow:hidden}
+.sp-bar .tr i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#c0582e,#8c1c1c)}
+.sp-bar .pc{flex:none;min-width:38px;text-align:right;font-size:13px;color:var(--muted);font-weight:700}

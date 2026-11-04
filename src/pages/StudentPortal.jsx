@@ -131,18 +131,48 @@ function ResultView({ stu, onLogout, onTerm, busy }) {
             <b>{s.name}</b>
             <div className="sp-tags"><span>ชั้น {s.level}</span><span>เลขที่ {s.no}</span><span>เลขประจำตัว {s.sid}</span></div>
           </div>
+          {p1 ? (() => {
+            // ประถมภาคเรียนที่ 1 ยังไม่มีเกรด: สรุปเป็นคะแนนรวมและเปอร์เซ็นต์แทน GPA
+            const sc = r.subjects.filter((x) => x.score != null), tot = sc.reduce((a, x) => a + x.score, 0), max = sc.length * (r.full || 50)
+            return (
+              <div className="sp-stats">
+                <div className="gpa"><span>คะแนนรวม</span><b>{sc.length ? tot : '-'}</b><small>/ {max || '-'}</small></div>
+                <div><span>เฉลี่ย</span><b>{max ? Math.round((tot / max) * 100) + '%' : '-'}</b></div>
+                <div><span>รายวิชา</span><b>{r.subjects.length}</b></div>
+                <div><span>{r.crW}ที่ลง</span><b>{cr1(r.crAll)}</b></div>
+              </div>
+            )
+          })() : (
           <div className="sp-stats">
             <div className="gpa"><span>GPA</span><b>{r.gpa == null ? '-' : r.gpa.toFixed(2)}</b></div>
             <div><span>{r.crW}ที่ลง</span><b>{cr1(r.crAll)}</b></div>
             <div><span>{r.crW}ที่ได้</span><b>{p1 ? '-' : cr1(r.crGot)}</b></div>
             <div><span>กิจกรรม</span><b>{r.actAll == null ? '-' : r.actAll === 'ผ' ? 'ผ่าน' : r.actAll === 'มผ' ? 'ไม่ผ่าน' : '-'}</b></div>
           </div>
+          )}
         </div>
-        {p1 && <div className="sp-note">ภาคเรียนที่ 1 ของประถมแจ้งคะแนน (เต็มวิชาละ 50) ยังไม่ตัดสินระดับผลการเรียน ผลทั้งปีประกาศเมื่อสิ้นภาคเรียนที่ 2</div>}
-        <div className="sp-h"><b>รายวิชา {r.subjects.length} วิชา</b><span>{r.showScore ? 'เกรดและคะแนน' : 'แสดงเฉพาะเกรด'}</span></div>
+        {p1 && <div className="sp-note"><b>ภาคเรียนที่ 1 แจ้งคะแนนก่อน</b><br /><span className="nw">เกรดและ GPA ประกาศเมื่อจบ</span><span className="nw">ภาคเรียนที่ 2 (ผลทั้งปี)</span></div>}
+        <div className="sp-h"><b>รายวิชา {r.subjects.length} วิชา</b><span>{p1 ? `คะแนนเต็มวิชาละ ${r.full || 50}` : r.showScore ? 'เกรดและคะแนน' : 'แสดงเฉพาะเกรด'}</span></div>
         <div className="sp-list">
           {r.subjects.map((x) => {
             const g = x.after !== '' && x.after != null ? x.after : x.grade
+            if (p1) {
+              const pc = x.score == null ? null : Math.round((x.score / (r.full || 50)) * 100)
+              return (
+                <div className="sp-row" key={x.code}>
+                  <div className={`sp-g sc ${pc == null ? 'g-x' : pc >= 80 ? 'g-a' : pc >= 60 ? 'g-b' : pc >= 50 ? 'g-c' : 'g-f'}`} aria-label={`คะแนน ${x.score ?? '-'} จาก ${r.full || 50}`}>
+                    <b>{x.score ?? '-'}</b><small>/{r.full || 50}</small>
+                  </div>
+                  <div className="sp-info">
+                    <div className="sp-meta"><span>{x.code} · {x.type}</span><span>{cr1(x.cr)} {r.crW}</span></div>
+                    <b className="sp-name">{x.name.split(/ (?![0-9])/).map((t, i) => <span key={i} className="nw">{t}</span>)}</b>
+                    {pc == null ? <span className="sp-sub">ยังไม่มีคะแนน</span> : (
+                      <div className="sp-bar" role="img" aria-label={`${pc} เปอร์เซ็นต์`}><span className="tr"><i style={{ width: pc + '%' }} /></span><span className="pc">{pc}%</span></div>
+                    )}
+                  </div>
+                </div>
+              )
+            }
             return (
               <div className="sp-row" key={x.code}>
                 <div className={`sp-g ${gradeTone(g)}`} aria-label={`ผลการเรียน ${g ?? '-'}`}>{g ?? '-'}</div>

@@ -39,13 +39,13 @@ function shape(doc, opts) {
     gpa: d.gpa, crAll: d.crAll, crGot: d.crGot, publishedAt: doc.at,
     subjects: d.subjects.map((x) => ({
       code: x.code, name: x.name, type: x.type, cr: x.cr, grade: x.grade, after: x.after,
-      ...(opts.score ? { score: x.score } : {}),
+      ...(opts.score || d.mode === 'p1' ? { score: x.score } : {}),
     })),
-    showScore: !!opts.score,
+    showScore: !!opts.score || d.mode === 'p1', // ประถมภาคเรียนที่ 1 ยังไม่มีเกรด จึงแสดงคะแนนเสมอ
   }
   if (opts.ev) Object.assign(out, { evA: d.evA, evR: d.evR })
   if (opts.act) Object.assign(out, { acts: d.acts, actAll: d.actAll })
-  if (opts.pdf) out.html = (opts.score || !doc.htmlNs ? doc.html : doc.htmlNs) || null
+  if (opts.pdf) out.html = (opts.score || d.mode === 'p1' || !doc.htmlNs ? doc.html : doc.htmlNs) || null
   return out
 }
 
