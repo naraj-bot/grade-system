@@ -2,7 +2,7 @@
 // - หน้าเว็บ (navigation): ขอจากเน็ตก่อน ถ้าเน็ตหลุดใช้หน้าที่เก็บไว้
 // - ไฟล์ /assets/* (มีแฮชในชื่อ), ตรา, ไอคอน, ฟอนต์: ใช้ที่เก็บไว้ก่อน
 // - ไม่เก็บ /api/* และข้อมูล Firebase (ต้องเป็นข้อมูลล่าสุดเสมอ)
-const CACHE = 'bp-grade-v1'
+const CACHE = 'bp-grade-v2'
 const SHELL = ['/', '/logo.png', '/favicon.png', '/manifest.webmanifest', '/icons/icon-192.png']
 
 self.addEventListener('install', (e) => {

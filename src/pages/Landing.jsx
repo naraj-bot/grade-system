@@ -5,6 +5,7 @@ import { db } from '../firebase'
 import Login from './Login'
 import { StudentKeypad, saveStu } from './StudentPortal'
 import InstallButton from '../components/InstallButton'
+import { frontList, dueOf } from '../lib/news'
 
 // หน้าแรก (ยังไม่ล็อกอิน) จบในหน้าเดียว: ชื่อระบบ ปุ่มนักเรียน/ครู สถานะประกาศผล และประกาศล่าสุด
 const OFFICE = 'สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสิงห์บุรี'
@@ -23,14 +24,29 @@ export function phrases(t) {
   return out
 }
 const Title = ({ t }) => <>{phrases(t).map((p, i) => (p.includes('\u00a0') && p.length <= 30 ? <span key={i} className="nw">{p}</span> : <span key={i}>{p} </span>))}</>
+// นับถอยหลังถึงวันที่กำหนด เช่น วันผลการเรียนออก
+function DueLine({ n, onStudent }) {
+  const d = dueOf(n.due)
+  if (!d) return null
+  if (n.auto) return (n.dueLabel || 'ผลการเรียนออก') === 'ผลการเรียนออก' ? <button type="button" className="ld-go" onClick={onStudent}>ดูผลการเรียน →</button> : null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const days = Math.round((d - today) / 86400000)
+  const when = days > 1 ? `อีก ${days} วัน` : days === 1 ? 'พรุ่งนี้' : days === 0 ? 'วันนี้' : 'ถึงกำหนดแล้ว'
+  return (
+    <div className={`ld-due${days <= 0 ? ' now' : ''}`}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></svg>
+      <span>{n.dueLabel || 'ผลการเรียนออก'} <b>{d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' })}</b></span>
+      <em>{when}</em>
+    </div>
+  )
+}
 const day = (t) => new Date(t).toLocaleDateString('th-TH', { day: 'numeric' })
 const mon = (t) => new Date(t).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' })
 
 function useNews() {
   const [list, setList] = useState(null)
   useEffect(() => onSnapshot(collection(db, 'news'),
-    (s) => setList(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => x.show !== false)
-      .sort((a, b) => (!!b.pin - !!a.pin) || (b.at || 0) - (a.at || 0)).slice(0, 3)),
+    (s) => setList(frontList(s.docs.map((d) => ({ id: d.id, ...d.data() })))),
     () => setList([])), [])
   return list
 }
@@ -118,9 +134,10 @@ export default function Landing() {
               <div className="ld-none">ยังไม่มีประกาศจากโรงเรียน</div>
             ) : news.map((n) => (
               <div className="ld-news" key={n.id}>
-                <div className="ld-date"><b>{day(n.at)}</b><span>{mon(n.at)}</span></div>
+                <div className="ld-date"><b>{day(n.eff)}</b><span>{mon(n.eff)}</span></div>
                 <div>
                   <div className="ld-title"><Title t={n.title} /></div>
+                  <DueLine n={n} onStudent={openStudent} />
                   <div className="ld-by">{n.tag && <span className={`ld-tag ${TAG[n.tag] || ''}`}>{n.tag}</span>}<span>{n.by}</span></div>
                 </div>
               </div>
