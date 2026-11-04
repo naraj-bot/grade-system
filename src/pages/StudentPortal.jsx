@@ -72,7 +72,43 @@ function printReport(html, title) {
   if (w.document.fonts && w.document.fonts.ready) w.document.fonts.ready.then(go); else w.onload = go
 }
 
+// บันทึกใบแจ้งผลเป็นรูปภาพ PNG (A4) ในเครื่อง: วาด HTML ลง SVG foreignObject แล้วแปลงเป็นภาพ
+// ฟอนต์และรูปต้องฝังเป็น data URL ก่อน ไม่อย่างนั้นภาพจะไม่มีฟอนต์/รูป
+const dataUrl = async (u) => { const b = await (await fetch(u)).blob(); return new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b) }) }
+export async function reportPng(html) {
+  const O = location.origin, W = 794, H = 1123, K = 2
+  let css = printCss(O).replace(/@font-face\{[^}]*Italic[^}]*\}/g, '').replace(/@page[^{]*\{[^}]*\}/g, '')
+  for (const f of ['THSarabunPSK.ttf', 'THSarabunPSK-Bold.ttf']) css = css.split(`${O}/fonts/${f}`).join(await dataUrl(`/fonts/${f}`))
+  let body = html
+  for (const u of [...new Set([...html.matchAll(/src="([^"]+)"/g)].map((m) => m[1]).filter((u) => !u.startsWith('data:')))]) {
+    try { body = body.split(`src="${u}"`).join(`src="${await dataUrl(u)}"`) } catch { /* รูปที่โหลดไม่ได้ข้ามไป */ }
+  }
+  const box = document.createElement('div')
+  box.setAttribute('style', `width:${W}px;height:${H}px;box-sizing:border-box;padding:53px;background:#fff;overflow:hidden`)
+  box.innerHTML = `<style>${css}</style>${body}`
+  const xml = new XMLSerializer().serializeToString(box)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`
+  const img = new Image()
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+  await img.decode()
+  await new Promise((r) => setTimeout(r, 250)) // ให้ฟอนต์ที่ฝังไว้พร้อมก่อนวาด
+  const cv = document.createElement('canvas'); cv.width = W * K; cv.height = H * K
+  const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height); x.scale(K, K); x.drawImage(img, 0, 0)
+  return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('สร้างภาพไม่ได้'))), 'image/png'))
+}
+async function saveImage(html, name) {
+  const blob = await reportPng(html)
+  const file = new File([blob], name + '.png', { type: 'image/png' })
+  // มือถือ: เปิดเมนูแชร์ (เลือก "บันทึกรูปภาพ" ลงคลังภาพได้) · คอมพิวเตอร์: ดาวน์โหลดไฟล์
+  if (/iPhone|iPad|Android|Mobi/i.test(navigator.userAgent) && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return } catch (e) { if (e && e.name === 'AbortError') return }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+}
+
 function ResultView({ stu, onLogout, onTerm, busy }) {
+  const [img, setImg] = useState(false)
   const { student: s, terms, result: r } = stu.data
   const p1 = r.mode === 'p1'
   const tk = r.year + '_' + r.term
@@ -131,7 +167,18 @@ function ResultView({ stu, onLogout, onTerm, busy }) {
             </div>
           </>
         )}
-        {r.html && <button type="button" className="sp-go wide" onClick={() => printReport(r.html, `ใบแจ้งผลการเรียน ${s.name} ${r.term}-${r.year}`)}>ดาวน์โหลดใบแจ้งผล (PDF)</button>}
+        {r.html && (
+          <div className="sp-dl">
+            <button type="button" className="sp-go wide" onClick={() => printReport(r.html, `ใบแจ้งผลการเรียน ${s.name} ${r.term}-${r.year}`)}>ดาวน์โหลดใบแจ้งผล (PDF)</button>
+            <button type="button" className="sp-img" disabled={img} onClick={async () => {
+              setImg(true)
+              try { await saveImage(r.html, `ใบแจ้งผลการเรียน_${s.name}_${r.term}-${r.year}`) } catch { alert('อุปกรณ์นี้สร้างรูปภาพไม่ได้ ใช้ปุ่ม PDF หรือแคปหน้าจอแทน') } finally { setImg(false) }
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" /></svg>
+              {img ? 'กำลังสร้างรูปภาพ…' : 'บันทึกเป็นรูปภาพ'}
+            </button>
+          </div>
+        )}
         <p className="sp-foot">ประกาศผลเมื่อ {new Date(r.publishedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}<br />หากข้อมูลไม่ถูกต้อง โปรดติดต่อครูประจำชั้น</p>
       </div>
     </div>

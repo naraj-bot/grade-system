@@ -571,3 +571,6 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .main>.top,.main>.credit{will-change:transform;transform:translateZ(0)}
 /* แถบหัวค้างด้านบน: ใช้เงาทึบสีพื้นปิดช่องว่างเหนือแถบ (เบากว่าแผ่นพื้นหลังแบบ fixed + mask ที่ทำให้สีแถบจางและเลื่อนอืด) */
 .main>.top{box-shadow:0 4px 12px rgba(122,22,22,.18),0 -12px 0 4px var(--bg)}
+.sp-dl{display:grid;gap:10px}
+.sp-img{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;border-radius:18px;border:2px solid #8c1c1c;background:#fff;color:#8c1c1c;font:600 18px var(--f-display);cursor:pointer}
+.sp-img:disabled{opacity:.6;cursor:default}
