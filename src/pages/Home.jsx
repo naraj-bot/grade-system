@@ -13,7 +13,7 @@ export default function Home() {
   const nav = useNavigate()
   const admin = isAdminRole(user.role)
   const mine = regs.filter((r) => r.term === term)
-  const pending = regs.filter((r) => r.term === term && r.status === 'pending').length
+  const pending = regs.filter((r) => r.term === term && (r.status === 'pending' || r.reqCodes)).length
   const approved = mine.filter((r) => r.status === 'ok').reduce((n, r) => n + r.codes.length, 0)
   const back = mine.filter((r) => r.status === 'back')
 

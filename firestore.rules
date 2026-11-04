@@ -68,7 +68,13 @@ service cloud.firestore {
         || (signedIn() && resource.data.uid == request.auth.uid
             && resource.data.status != 'ok'
             && request.resource.data.uid == request.auth.uid
-            && request.resource.data.status == 'pending');
+            && request.resource.data.status == 'pending')
+        // ใบที่อนุมัติแล้ว: ครูส่ง/แก้/ยกเลิก "คำขอแก้ไข" ได้เท่านั้น (reqCodes) ห้ามแตะ codes/status
+        // วิชาเดิมจึงยังใช้งานได้จนกว่าแอดมินจะอนุมัติคำขอ
+        || (signedIn() && resource.data.uid == request.auth.uid
+            && resource.data.status == 'ok'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reqCodes', 'reqAt', 'reqMsg'])
+            && (!('reqCodes' in request.resource.data) || request.resource.data.reqCodes is list));
       allow delete: if isAdmin();
     }
 
