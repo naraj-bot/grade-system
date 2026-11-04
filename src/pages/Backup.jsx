@@ -4,10 +4,10 @@ import { db } from '../firebase'
 import { useAuth } from '../auth'
 
 // สำรองข้อมูลทั้งระบบเป็นไฟล์ JSON และกู้คืนจากไฟล์ (กู้คืนได้เฉพาะแอดมินหลัก)
-const FLAT = ['students', 'studentLog', 'subjectOpen', 'registrations', 'work', 'sigs', 'settings', 'users']
+const FLAT = ['students', 'studentLog', 'subjectOpen', 'registrations', 'work', 'sigs', 'settings', 'users', 'news', 'publishMeta', 'published']
 const LABEL = { years: 'ปีการศึกษา/ภาคเรียน', students: 'นักเรียน', studentLog: 'ประวัติแก้ไขนักเรียน', subjectOpen: 'รายวิชาที่เปิดสอน', registrations: 'ใบลงทะเบียนสอน', work: 'คะแนน/ค่าตั้ง/ประเมิน/กิจกรรม/ใบแจ้งผล', sigs: 'ลายเซ็น', settings: 'ตั้งค่าโรงเรียน', users: 'รายชื่อผู้ใช้ (เพื่อเก็บไว้ดู ไม่ใช้กู้คืน)' }
 // กู้คืนไม่เขียนทับ users (บัญชีเข้าสู่ระบบอยู่ใน Firebase Auth) และ studentLog (กฎห้ามแก้ประวัติ)
-const RESTORE = ['years', 'students', 'subjectOpen', 'registrations', 'work', 'sigs', 'settings']
+const RESTORE = ['years', 'students', 'subjectOpen', 'registrations', 'work', 'sigs', 'settings', 'news', 'publishMeta', 'published']
 
 const stamp = () => { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear() + 543}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}` }
 
@@ -38,7 +38,7 @@ export default function Backup() {
       out.data.years = years
       const text = JSON.stringify(out)
       const a = document.createElement('a')
-      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = `สำรองข้อมูลระบบตัดเกรด-${stamp()}.json`
+      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = `สำรองข้อมูลระบบผลการเรียน-${stamp()}.json`
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000)
       const n = Object.values(out.data).reduce((a, b) => a + b.length, 0)
       setMsg(`สำรองข้อมูลแล้ว (${n.toLocaleString()} รายการ) เก็บไฟล์ไว้ในที่ปลอดภัย`)

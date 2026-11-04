@@ -36,12 +36,24 @@ export default function Login({ onClose }) {
     }
   }
 
+  // เบราว์เซอร์ในแอป (LINE, Facebook, Messenger, Instagram ฯลฯ) แยกที่เก็บข้อมูลของหน้าต่างล็อกอิน Google
+  // ทำให้ Firebase ขึ้น "missing initial state" → แนะนำให้เปิดใน Safari/Chrome แทน
+  const inApp = /Line\/|FBAN|FBAV|FB_IAB|Instagram|Messenger|MicroMessenger|; wv\)|GSA\//i.test(navigator.userAgent || '')
+  const openOutside = () => {
+    const u = new URL(location.href)
+    if (/Line\//i.test(navigator.userAgent)) { u.searchParams.set('openExternalBrowser', '1'); location.href = u.toString(); return }
+    try { navigator.clipboard?.writeText(location.origin) } catch { /* ไม่เป็นไร */ }
+    setError('คัดลอกลิงก์แล้ว เปิดแอป Safari หรือ Chrome แล้ววางลิงก์เพื่อเข้าสู่ระบบด้วย Google')
+  }
   const google = async () => {
+    if (inApp) { setError('เข้าสู่ระบบด้วย Google จากเบราว์เซอร์ในแอปนี้ไม่ได้ กด "เปิดใน Safari/Chrome" ด้านล่าง หรือเข้าด้วยชื่อผู้ใช้และรหัสผ่านแทน'); return }
     setError(''); setBusy(true)
     try {
       await loginGoogle()
     } catch (e) {
       if (e.message === 'NOT_LINKED') setError('บัญชี Google นี้ยังไม่ได้ผูกกับผู้ใช้ในระบบ ให้เข้าด้วยอีเมล/รหัสผ่านก่อน แล้วกด "ผูกบัญชี Google" ที่หน้าแรก')
+      else if (e.code === 'auth/popup-blocked') setError('เบราว์เซอร์บล็อกหน้าต่างล็อกอิน Google อนุญาตป๊อปอัปสำหรับเว็บนี้ แล้วลองอีกครั้ง')
+      else if (e.code === 'auth/web-storage-unsupported' || /initial state/i.test(e.message || '')) setError('เบราว์เซอร์นี้ไม่รองรับการเข้าสู่ระบบด้วย Google (มักเกิดในเบราว์เซอร์ของแอป LINE/Facebook หรือโหมดส่วนตัว) โปรดเปิดใน Safari หรือ Chrome')
       else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') setError('เข้าสู่ระบบด้วย Google ไม่สำเร็จ (' + (e.code || e.message) + ')')
     } finally { setBusy(false) }
   }
@@ -68,6 +80,7 @@ export default function Login({ onClose }) {
         {error && <div className="small" style={{ color: 'var(--bad)' }}>{error}</div>}
         <button className="btn" disabled={busy}>{busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>
         {showG && <button type="button" className="btn alt" disabled={busy} onClick={google}>เข้าสู่ระบบด้วย Google</button>}
+        {showG && inApp && <button type="button" className="btn alt" onClick={openOutside}>เปิดใน Safari/Chrome</button>}
         <div className="small muted">เข้าครั้งแรกต้องเปลี่ยนรหัสผ่านก่อนใช้งาน · ลืมรหัสผ่านให้ติดต่อผู้ดูแลระบบของโรงเรียน</div>
       </form>
     </div>

@@ -116,6 +116,24 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ประกาศหน้าแรก: ทุกคนอ่านได้ (รวมผู้ที่ยังไม่ล็อกอิน) แอดมินเขียน
+    match /news/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin() && request.resource.data.title is string && request.resource.data.title.size() <= 160;
+      allow delete: if isAdmin();
+    }
+    // สถานะ/ตัวเลือกการเผยแพร่ผลรายภาคเรียน: ทุกคนอ่านได้ (หน้าแรกแสดงสถานะ) แอดมินเขียน
+    match /publishMeta/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    // ผลการเรียนที่เผยแพร่: แอดมินเท่านั้น (นักเรียนอ่านผ่าน /api/student-result ด้วย Admin SDK)
+    match /published/{id} {
+      allow read, write: if isAdmin();
+    }
+    // ตัวนับกันสุ่มเลขประจำตัว (ใช้โดย Admin SDK เท่านั้น)
+    match /rl/{id} { allow read, write: if false; }
+
     // ส่วนอื่น (นักเรียน รายวิชา คะแนน ฯลฯ) ปิดไว้ก่อน จะเพิ่มกฎในขั้นถัดไป
     match /{document=**} { allow read, write: if false; }
   }

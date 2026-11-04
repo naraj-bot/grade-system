@@ -26,7 +26,7 @@ function printSlips(list) {
   const css = `@font-face{font-family:'TH SarabunPSK';src:url(${location.origin}/fonts/THSarabunPSK.ttf)}@font-face{font-family:'TH SarabunPSK';font-weight:700;src:url(${location.origin}/fonts/THSarabunPSK-Bold.ttf)}
 @page{size:A4;margin:12mm}body{font-family:'TH SarabunPSK';font-size:16pt;margin:0}.g{display:grid;grid-template-columns:1fr 1fr;gap:8mm}
 .c{border:1.5px dashed #555;padding:6mm;break-inside:avoid}.c b{font-size:18pt;color:#8c1c1c}.c div{margin:2px 0}.pw{font-size:20pt;font-weight:700;letter-spacing:.06em}`
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>ใบรหัสผ่านเริ่มต้น</title><style>${css}</style></head><body><div class="g">${list.map((x) => `<div class="c"><b>ระบบตัดเกรด โรงเรียนวัดบางปูน</b><div>ชื่อ: ${esc(x.name)}</div><div>ชื่อผู้ใช้: <b style="color:#000">${esc(x.username)}</b></div><div>รหัสผ่านเริ่มต้น: <span class="pw">${esc(x.pw)}</span></div><div style="font-size:13pt">เมื่อเข้าครั้งแรกระบบจะให้ตั้งรหัสผ่านใหม่ทันที</div></div>`).join('')}</div></body></html>`)
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>ใบรหัสผ่านเริ่มต้น</title><style>${css}</style></head><body><div class="g">${list.map((x) => `<div class="c"><b>ระบบผลการเรียน โรงเรียนวัดบางปูน</b><div>ชื่อ: ${esc(x.name)}</div><div>ชื่อผู้ใช้: <b style="color:#000">${esc(x.username)}</b></div><div>รหัสผ่านเริ่มต้น: <span class="pw">${esc(x.pw)}</span></div><div style="font-size:13pt">เมื่อเข้าครั้งแรกระบบจะให้ตั้งรหัสผ่านใหม่ทันที</div></div>`).join('')}</div></body></html>`)
   w.document.close(); w.onload = () => setTimeout(() => { w.focus(); w.print() }, 400)
 }
 

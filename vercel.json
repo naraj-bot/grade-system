@@ -1,7 +1,11 @@
 {
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/__/auth/:path*",
+      "destination": "https://grade-bangpoon69.firebaseapp.com/__/auth/:path*"
+    },
+    {
+      "source": "/((?!api/|__/).*)",
       "destination": "/index.html"
     }
   ],

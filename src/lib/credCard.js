@@ -1,5 +1,5 @@
 // การ์ดชื่อผู้ใช้/รหัสผ่าน: คัดลอกข้อความ และบันทึกเป็นภาพ PNG รายบุคคล
-export const credText = (c) => `ระบบตัดเกรด โรงเรียนวัดบางปูน\nชื่อ: ${c.name}\nชื่อผู้ใช้: ${c.username}\nรหัสผ่านเริ่มต้น: ${c.pw}\n(เข้าครั้งแรกต้องตั้งรหัสผ่านใหม่)\n${location.origin}`
+export const credText = (c) => `ระบบผลการเรียน โรงเรียนวัดบางปูน\nชื่อ: ${c.name}\nชื่อผู้ใช้: ${c.username}\nรหัสผ่านเริ่มต้น: ${c.pw}\n(เข้าครั้งแรกต้องตั้งรหัสผ่านใหม่)\n${location.origin}`
 
 export async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true } catch { /* ใช้วิธีสำรอง */ }
@@ -21,7 +21,7 @@ export async function credBlob(c) {
   g.fillStyle = grad; rr(24, 24, W - 48, 130, 26); g.fill()
   const logo = await loadImg('/logo.png')
   if (logo) { g.fillStyle = '#fff'; rr(48, 44, 92, 92, 22); g.fill(); g.drawImage(logo, 54, 50, 80, 80) }
-  g.fillStyle = '#fff'; g.font = F(700, 54); g.fillText('ระบบตัดเกรด', 164, 92)
+  g.fillStyle = '#fff'; g.font = F(700, 54); g.fillText('ระบบผลการเรียน', 164, 92)
   g.fillStyle = '#f3d27a'; g.font = F(400, 36); g.fillText('โรงเรียนวัดบางปูน', 164, 134)
   g.fillStyle = '#2b1b1b'; g.font = F(400, 40); g.fillText(c.name, 56, 214)
   const row = (y, label, val, color) => {

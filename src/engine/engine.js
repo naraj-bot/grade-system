@@ -1,7 +1,7 @@
 /* eslint-disable */
 // เอนจินกรอกคะแนน/ประเมิน/กิจกรรม/ปพ.5/ใบแจ้งผล — ย้ายจากต้นแบบที่ทดสอบแล้ว
 // ผูกกับ Firestore: work/{ปี~หมวด~คีย์}, sigs/{uid}, settings/school
-import { collection, deleteDoc, doc, onSnapshot, query, setDoc, where } from 'firebase/firestore'
+import { collection, deleteDoc, doc, onSnapshot, query, setDoc, where, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { printCss } from './printcss'
 import { buildXlsx } from '../lib/xlsx'
@@ -13,7 +13,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const LOGO = location.origin + '/logo.png'
 const LEVELS = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3']
 const isPri = (l) => l.startsWith('ป.')
-const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'summary', 'sign', 'school', 'guide', 'att', 'progress']
+const PAGES_OK = ['scores', 'acts', 'eval', 'p5', 'report', 'summary', 'sign', 'school', 'guide', 'att', 'progress', 'publish']
 
 let CAT = []
 let STU = []
@@ -69,14 +69,15 @@ const uk=(T,l)=>(T===1&&isPri(CAT.find(x=>x.code===S.scCode).level))?'①'+l:l;
 // ค่าตั้งวิชาที่เป็นค่าเริ่มต้นถูกบันทึกเป็น {} (ดู cleaned) → เติมค่าที่ขาดทุกครั้งที่อ่าน กันหน้าพังเมื่อโหลดจาก Firestore
 function cfgOf(code,T){const k=TK(code,T);const f=S.cfg[k]||(S.cfg[k]={});if(!Array.isArray(f.cols)||!f.cols.length)f.cols=[{n:'คะแนนเก็บระหว่างภาค',max:0}];if(!f.scale)f.scale=100;if(!f.hours)f.hours=40;return f;}
 function fulls(code,T){const c=CAT.find(x=>x.code===code),f=cfgOf(code,T),base=isPri(c.level)?f.scale:100,[r1,r2]=(f.ratio||'70:30').split(':').map(Number);return {base,mid:base*r1/100,fin:base*r2/100};}
-const sumC=v=>{const a=(v&&v.c)||[];return a.length&&a.every(x=>x!==''&&x!=null)?a.reduce((p,q)=>p+(+q),0):null;};
+// รวมคะแนนเก็บเฉพาะช่องที่ตั้งไว้ตอนนี้ (n ช่อง) ข้อมูลเกินจากช่องที่ถูกลบไปแล้วไม่นับ
+const sumC=(v,n)=>{const a=((v&&v.c)||[]).slice(0,n);return n&&a.length===n&&a.every(x=>x!==''&&x!=null)?a.reduce((p,q)=>p+(+q),0):null;};
 function calc(code,T){T=T||S.term;const c=CAT.find(x=>x.code===code),pri=isPri(c.level),F=fulls(code,T),cfg=cfgOf(code,T),H=cfg.hours,key=TK(code,T);
  if(cfg.cols.length===1)cfg.cols[0].max=F.mid;
  S.scores[key]=S.scores[key]||{};S.ab[code]=S.ab[code]||{};
  const t1=(pri&&T===2)?Object.fromEntries(calc(code,1).map(r=>[r.s.id,r.cur])):{},H1=pri?cfgOf(code,1).hours:H;
  return ACT().filter(s=>s.level===c.level).map(s=>{const v=S.scores[key][s.id]||(S.scores[key][s.id]={c:[],f:''});
   const a=S.ab[code][s.id]||(S.ab[code][s.id]={});
-  const mid=sumC(v),fin=(v.f===''||v.f==null)?null:+v.f,tot=(mid==null||fin==null)?null:mid+fin;
+  const mid=sumC(v,cfg.cols.length),fin=(v.f===''||v.f==null)?null:+v.f,tot=(mid==null||fin==null)?null:mid+fin;
   const cur=tot==null?null:(pri&&F.base===100?tot/2:tot);const pr=(pri&&T===2)?(t1[s.id]??null):null;
   let att=null,pct=null;
   const A=t=>{const HH=(pri&&T===2&&t===1)?H1:H,ab=attAbs(code,t,s.id);if(ab!=null)return Math.min(HH,ab);const x=+a[t];return x>0?Math.min(HH,x):0;};
@@ -116,7 +117,11 @@ function progRows(){
   regs.forEach(r=>r.codes.forEach(code=>{const c=CAT.find(x=>x.code===code);if(!okc(c)||seen.has(code))return;seen.add(code);
     let tn='-';try{tn=(USERS[r.t]&&USERS[r.t].name)||r.name||'-';}catch(e){}
     out.push({code,c,teacher:tn,p:progSafe(code,T)});}));
-  if(isAdmin())CAT.filter(c=>S.openSubj.has(c.code)&&okc(c)&&!seen.has(c.code)).forEach(c=>out.push({code:c.code,c,teacher:'-',p:{...progSafe(c.code,T),st:'noteacher'},nt:true}));
+  // วิชาที่เปิดสอนแต่ไม่มีใบลงทะเบียนที่อนุมัติ: ถ้ามีคนกรอกคะแนน/ส่งผลแล้ว (เช่น แอดมินกรอกเองโดยไม่ได้ลงทะเบียน)
+  // แสดงความคืบหน้าจริง + ชื่อผู้ส่งผล และป้าย "ยังไม่ลงทะเบียนสอน" แทน "ยังไม่มีครูสอน"
+  if(isAdmin())CAT.filter(c=>S.openSubj.has(c.code)&&okc(c)&&!seen.has(c.code)).forEach(c=>{const p=progSafe(c.code,T);
+    if(p.sub||p.any)out.push({code:c.code,c,teacher:(p.sub&&p.sub.name)||'-',p,unreg:true});
+    else out.push({code:c.code,c,teacher:'-',p:{...p,st:'noteacher'},nt:true});});
   return out.sort((a,b)=>a.c.level.localeCompare(b.c.level,'th')||a.code.localeCompare(b.code));
 }
 function submitSubject(code){
@@ -160,7 +165,7 @@ P.progress=()=>{
   const list=rows.filter(r=>F==='all'||r.p.st===F);
   const chip=(k,t)=>`<button class="chip" aria-pressed="${F===k}" data-pgf="${k}">${t}</button>`;
   const bar=r=>`<div style="background:#eee;border-radius:99px;height:8px;min-width:70px;overflow:hidden"><div style="width:${r.p.n?Math.round(r.p.full/r.p.n*100):0}%;height:8px;background:${r.p.st==='sent'?'#2e7d32':'#c4883a'}"></div></div>`;
-  const tr=list.map(r=>{const p=r.p;return `<tr><td><b>${r.code}</b><div class="small muted">${esc(r.c.name)}</div></td><td>${r.c.level}</td>${isAdmin()?`<td>${esc(r.teacher)}</td>`:''}<td class="num">${p.n}</td>
+  const tr=list.map(r=>{const p=r.p;return `<tr><td><b>${r.code}</b><div class="small muted">${esc(r.c.name)}</div></td><td>${r.c.level}</td>${isAdmin()?`<td>${esc(r.teacher)}${r.unreg?'<div><span class="pill p-warn" title="วิชานี้มีการกรอกคะแนนแล้ว แต่ยังไม่มีใบลงทะเบียนสอนที่อนุมัติ ให้ครูผู้สอนลงทะเบียนวิชานี้ในเมนูลงทะเบียนวิชาสอน">ยังไม่ลงทะเบียนสอน</span></div>':''}</td>`:''}<td class="num">${p.n}</td>
    <td>${r.nt?'-':`${p.full}/${p.n}${bar(r)}`}</td><td>${r.nt?'-':p.att?'<span class="pill p-good">มีแล้ว</span>':'<span class="pill p-warn">ยังไม่มี</span>'}</td>
    <td>${r.nt?'-':!p.needEv?'<span class="small muted">ไม่ต้อง</span>':p.em?`<span class="pill p-warn">ขาด ${p.em} คน</span>`:p.n?'<span class="pill p-good">ครบ</span>':'-'}</td>
    <td><span class="pill ${PST[p.st][1]}">${PST[p.st][0]}</span>${p.sub?`<div class="small muted">${new Date(p.sub.at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'})}</div>`:''}</td>
@@ -536,10 +541,10 @@ P.eval=()=>{const codes=pickSubject();
   <span class="small" style="margin-left:10px">ตั้งตามเลขที่:</span><input id="evnos" placeholder="เช่น 1,3,5-8" size="14" aria-label="เลขที่นักเรียน หลายคนคั่นด้วยจุลภาค"><select id="evlv" aria-label="ระดับ">${opts}</select><button class="btn sm" data-act="evnos">ใช้กับเลขที่เหล่านี้</button></div>
  <div class="row">${EVL.map(l=>`<span class="pill ${l==='ไม่ผ่าน'?'p-bad':l==='ผ่าน'?'p-gold':'p-good'}">${l} ${o[l]} คน</span>`).join('')}<span class="small muted">ประเมินแล้ว ${all}/${R.length}</span></div>
  <div class="small muted" style="line-height:1.5">${items.map((t,i)=>`<b>${i+1}</b> ${t}`).join(' · ')}</div>
- ${(()=>{const two=R.length>16&&innerWidth>=1500,half=two?Math.ceil(R.length/2):R.length;
-  const tbl=rs=>`<div class="tw evc ${two?'':'hd'}"><table><thead><tr><th>ที่</th><th>ชื่อ - สกุล</th><th>ทุกข้อ</th>${items.map((t,i)=>`<th title="${esc(t)}">${i+1}</th>`).join('')}<th>สรุป</th></tr></thead><tbody>
+ ${(()=>{// ตารางเดียวเสมอ เรียงเลขที่ต่อกัน หัวตารางค้างด้านบน (เดิมแบ่ง 2 ฝั่งเมื่อเกิน 16 คนบนจอกว้าง ทำให้กรอกสับสน)
+  const tbl=rs=>`<div class="tw evc hd"><table><thead><tr><th>ที่</th><th>ชื่อ - สกุล</th><th>ทุกข้อ</th>${items.map((t,i)=>`<th title="${esc(t)}">${i+1}</th>`).join('')}<th>สรุป</th></tr></thead><tbody>
   ${rs.map(r=>{const a=(st[r.s.id]||{})[k]||[];return `<tr><td>${r.s.no}</td><td>${esc(r.s.name)}</td><td><select data-evrow="${r.s.id}" aria-label="ตั้งทุกข้อ ${esc(r.s.name)}">${opts}</select></td>${items.map((t,i)=>`<td><select data-ev="${r.s.id}|${i}" aria-label="${esc(t)} ${esc(r.s.name)}">${['','3','2','1','0'].map(v=>`<option value="${v}" ${String(a[i]??'')===v?'selected':''}>${v===''?'-':v}</option>`).join('')}</select></td>`).join('')}<td>${evOverall(a,items.length)||'-'}</td></tr>`}).join('')}</tbody></table></div>`;
-  return two?`<div style="display:flex;gap:12px;align-items:flex-start">${tbl(R.slice(0,half))}${tbl(R.slice(half))}</div>`:tbl(R);})()}
+  return tbl(R);})()}
  </div>${nextBtn(c,R,'eval:'+k)}${k===EVK[EVK.length-1][0]?subCard(c,R):''}</div>`;};
 reg('click',e=>{const t=e.target.closest('[data-evk],[data-act]');if(!t)return;const d=t.dataset,a=d.act;
  if(d.evk){S.evKind=d.evk;render();return;}
@@ -641,6 +646,84 @@ P.report=()=>{const L=LEVELS.includes(S.rpLevel)?S.rpLevel:'ป.3',D=rptData(L),
  <div class="row">${D.mode==='p1'?'<span class="small muted">ภาคเรียนที่ 1 ประถมแสดงคะแนนเสมอ (ยังไม่มีเกรด)</span>':`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`}<label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${isAdmin()?`<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
  ${D.cal.length?'':'<div class="card empty">ชั้นนี้ยังไม่มีรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}
  ${D.stus.length&&D.cal.length?rptPage(L,s,D):''}</div>`;};
+// ===== เผยแพร่ผลการเรียนให้นักเรียนดูออนไลน์ =====
+// publishMeta/{ปี_ภาค}: ตัวเลือกการแสดงผล + สถานะรายชั้น (ทุกคนอ่านได้ ใช้แสดงบนหน้าแรก)
+// published/{ปี_ภาค_idนักเรียน}: สำเนาผลของนักเรียนแต่ละคน ณ เวลาที่กดเผยแพร่ (อ่านได้เฉพาะแอดมิน นักเรียนอ่านผ่าน /api/student-result)
+const PUB_OPTS={score:true,ev:true,act:true,pdf:true};
+let pubUnsub=null,pubKey='';S.pubMeta=null;S.pubBusy='';
+const pubId=T=>S.year+'_'+T;
+const sidKey=s=>String(s.sid||'').replace(/\D/g,'');
+function pubWatch(){const k=pubId(S.term);if(k===pubKey)return;pubKey=k;if(pubUnsub)pubUnsub();S.pubMeta=null;
+ pubUnsub=onSnapshot(doc(db,'publishMeta',k),s=>{S.pubMeta=s.exists()?s.data():{};render();},e=>{S.pubMeta={};report(e);});}
+const hashStr=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36);};
+// ข้อมูลผลการเรียนของนักเรียน 1 คน (คำนวณแบบเดียวกับใบแจ้งผล)
+function pubData(L,s,D){const T=D.T,M=D.mode,pri=D.pri,p1=M==='p1';
+ const rows=D.cal.map(x=>{const c=x.c,r=x.R.find(q=>q.s.id===s.id)||{},k=c.code+'|'+T,fx=((S.fix[k]||{})[s.id])||{},ev=((S.ev[k]||{})[s.id])||{};
+  const g=p1||r.g==null?null:r.g,after=p1?'':String(fx.after||'').trim(),afN=after!==''&&!isNaN(+after)?+after:null;
+  const eff=afN!=null?afN:(typeof g==='number'?g:null),score=p1?r.cur:M==='p2'?r.sum:r.tot;
+  return {code:c.code,name:c.name,type:c.code[3]==='2'?'เพิ่มเติม':'พื้นฐาน',cr:Math.round(credOf(c.code,T,pri)*10)/10,
+   score:score==null?null:Math.round(score+1e-9),grade:g,after,eff,
+   ea:p1?null:EVN(evOverall(ev.a,EVK[0][3].length)),er:p1?null:EVN(evOverall(ev.r,EVK[1][3].length))};});
+ const r1=x=>Math.round(x*10)/10,sum=l=>r1(l.reduce((a,x)=>a+x.cr,0)),got=l=>r1(l.reduce((a,x)=>a+(x.eff!=null&&x.eff>=1?x.cr:0),0));
+ const gr=rows.filter(x=>x.eff!=null),gpa=!p1&&gr.length?Math.round(gr.reduce((a,x)=>a+x.eff*x.cr,0)/sum(gr)*100)/100:null;
+ const avg=a=>{a=a.filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null;};
+ const clubE=Object.entries(S.members).find(([,m])=>(m.ids||[]).includes(s.id));
+ const acts=ACTS.map(a=>a==='ชุมนุม'?{n:clubE?`ชุมนุม (${clubE[0]})`:'ชุมนุม',v:clubE?((clubE[1].v||{})[s.id]||'-'):'-'}:{n:a,v:((S.acts[L+'|'+a]||{}).v||{})[s.id]||'-'});
+ return {year:S.year,term:T,level:L,mode:M,crW:pri?'น้ำหนัก':'หน่วยกิต',full:p1?50:100,name:s.name,no:s.no||'',sid:String(s.sid||''),
+  subjects:rows.map(({eff,...x})=>x),gpa,crAll:sum(rows),crGot:p1?null:got(rows),
+  evA:p1?null:evLabOf(avg(rows.map(x=>x.ea))),evR:p1?null:evLabOf(avg(rows.map(x=>x.er))),
+  acts:p1?acts.map(a=>({n:a.n,v:'-'})):acts,actAll:p1?null:acts.some(a=>a.v==='มผ')?'มผ':acts.every(a=>a.v==='ผ')?'ผ':'-'};}
+function pubInfo(L,T){const D=rptData(L,T),datas=D.stus.map(s=>pubData(L,s,D));
+ return {D,datas,hash:hashStr(JSON.stringify(datas)),sent:D.cal.filter(x=>S.sub[SUBK(x.c.code,T)]).length,tot:D.cal.length,noSid:D.stus.filter(s=>!sidKey(s)).length};}
+async function pubLevel(L){if(S.tpl)return;const T=S.term,key=pubId(T),I=pubInfo(L,T),D=I.D;
+ if(!D.stus.length)return toast('ชั้นนี้ยังไม่มีนักเรียน');
+ if(I.sent<I.tot&&!(await ask({title:'ครูยังส่งผลไม่ครบ',text:`ชั้น ${L} ส่งผลแล้ว ${I.sent} จาก ${I.tot} วิชา\nวิชาที่ยังไม่ส่ง นักเรียนจะเห็นผลเท่าที่ครูกรอกไว้ ณ ตอนนี้\n\nเผยแพร่เลยไหม?`,ok:'เผยแพร่',cancel:'ยังไม่เผยแพร่'})))return;
+ S.pubBusy=L;render();
+ const st=S.rpt[L]||(S.rpt[L]={}),keep=st.sc;
+ try{const b=writeBatch(db),ids=[];
+  D.stus.forEach((s,i)=>{st.sc=true;const html=rptPage(L,s,D);let htmlNs=null;if(D.mode!=='p1'){st.sc=false;htmlNs=rptPage(L,s,D);}
+   const id=key+'_'+s.id;ids.push(id);
+   b.set(doc(db,'published',id),{year:S.year,term:T,level:L,sidKey:sidKey(s),data:I.datas[i],html,htmlNs,at:Date.now()});});
+  const old=((S.pubMeta||{}).levels||{})[L];((old&&old.ids)||[]).filter(i=>!ids.includes(i)).forEach(i=>b.delete(doc(db,'published',i)));
+  b.set(doc(db,'publishMeta',key),{year:S.year,term:T,at:Date.now(),levels:{[L]:{at:Date.now(),by:me().name,hash:I.hash,n:ids.length,ids}}},{merge:true});
+  await b.commit();toast('เผยแพร่ผลชั้น '+L+' แล้ว');
+ }catch(e){report(e);}finally{if(keep===undefined)delete st.sc;else st.sc=keep;S.pubBusy='';render();}}
+async function unpubLevel(L){if(S.tpl)return;const key=pubId(S.term),old=((S.pubMeta||{}).levels||{})[L];if(!old)return;
+ if(!(await ask({title:'ยกเลิกการเผยแพร่?',text:`นักเรียนชั้น ${L} จะดูผลภาคเรียนที่ ${S.term} ไม่ได้จนกว่าจะเผยแพร่ใหม่`,ok:'ยกเลิกเผยแพร่',cancel:'ไม่ทำ',danger:true})))return;
+ S.pubBusy=L;render();
+ try{const b=writeBatch(db);(old.ids||[]).forEach(i=>b.delete(doc(db,'published',i)));
+  b.set(doc(db,'publishMeta',key),{at:Date.now(),levels:{[L]:null}},{merge:true});await b.commit();toast('ยกเลิกการเผยแพร่ชั้น '+L+' แล้ว');
+ }catch(e){report(e);}finally{S.pubBusy='';render();}}
+function pubSetOpt(k,v){if(S.tpl)return;setDoc(doc(db,'publishMeta',pubId(S.term)),{year:S.year,term:S.term,opts:{[k]:v}},{merge:true}).catch(report);}
+P.publish=()=>{if(!isAdmin())return '<div class="card empty">หน้านี้สำหรับแอดมินเท่านั้น</div>';
+ if(S.tpl)return '<div class="card empty">เปิดปีการศึกษาก่อน จึงจะเผยแพร่ผลได้</div>';
+ pubWatch();if(S.pubMeta===null)return '<div class="card empty">กำลังโหลด…</div>';
+ const T=S.term,m=S.pubMeta||{},o=Object.assign({},PUB_OPTS,m.opts||{}),lv=m.levels||{};
+ const PILL={pub:['เผยแพร่แล้ว','p-good'],changed:['มีการแก้ไขหลังเผยแพร่','p-warn'],ready:['พร้อมเผยแพร่','p-gold'],part:['ครูยังส่งผลไม่ครบ','p-bad']};
+ const dt=t=>new Date(t).toLocaleString('th-TH',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+ let pubN=0;
+ const rows=LEVELS.map(L=>{const I=pubInfo(L,T),n=I.D.stus.length;if(!n)return '';const p=lv[L];if(p)pubN++;
+  const st=p?(p.hash===I.hash?'pub':'changed'):(I.tot&&I.sent>=I.tot?'ready':'part'),busy=S.pubBusy===L;
+  const sub=p?`เมื่อ ${dt(p.at)}${p.by?' โดย '+esc(p.by):''}`:I.sent<I.tot?`ขาด ${I.tot-I.sent} วิชา`:'';
+  return `<tr><td><b>${L}</b></td><td class="num">${n}</td><td>${I.sent} / ${I.tot} วิชา</td>
+  <td><span class="pill ${PILL[st][1]}">${PILL[st][0]}</span>${sub?`<div class="small muted">${sub}</div>`:''}${I.noSid?`<div class="small" style="color:var(--bad)">ไม่มีเลขประจำตัว ${I.noSid} คน (เข้าดูผลไม่ได้)</div>`:''}</td>
+  <td style="text-align:right;white-space:nowrap">${busy?'<span class="small muted">กำลังบันทึก…</span>':`${st!=='pub'?`<button class="btn sm" data-pub="${L}">${p?'เผยแพร่ใหม่':'เผยแพร่'}</button>`:''}${p?` <button class="btn sm alt" data-unpub="${L}">ยกเลิกเผยแพร่</button>`:''}`}</td></tr>`;}).join('');
+ const seg=(v,label)=>`<button class="chip" aria-pressed="${o.score===v}" data-pubopt="score" data-v="${v?1:0}">${label}</button>`;
+ const chk=(k,label)=>`<label class="row" style="gap:8px;min-height:40px"><input type="checkbox" data-pubchk="${k}" ${o[k]?'checked':''}> ${label}</label>`;
+ const parts=[o.score?'คะแนนและเกรดรายวิชา':'เกรดรายวิชา (ไม่แสดงคะแนน)','GPA และหน่วยกิต'];if(o.ev)parts.push('ผลประเมินคุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน');if(o.act)parts.push('ผลกิจกรรม');if(o.pdf)parts.push('ดาวน์โหลดใบแจ้งผล PDF');
+ return `<div class="stack">
+ <div class="card stack"><h3>นักเรียนจะเห็นอะไรบ้าง · ภาคเรียนที่ ${T}</h3><div class="small muted">ใช้กับทุกชั้นในภาคเรียนนี้ เปลี่ยนได้ทุกเมื่อ และมีผลทันทีโดยไม่ต้องเผยแพร่ใหม่</div>
+ <div class="row"><b>ผลรายวิชา</b>${seg(true,'คะแนน + เกรด')}${seg(false,'เกรดอย่างเดียว')}</div>
+ <div class="row" style="gap:4px 18px">${chk('ev','ผลประเมินคุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน')}${chk('act','ผลกิจกรรมพัฒนาผู้เรียน')}${chk('pdf','ให้ดาวน์โหลดใบแจ้งผล (PDF)')}</div>
+ <div class="lock small"><b>สรุป</b> นักเรียนจะเห็น ${parts.join(' · ')}</div>
+ <div class="row small"><span>ลิงก์สำหรับนักเรียน:</span><code>${esc(location.origin)}/student</code><button class="btn sm alt" data-act="pubcopy">คัดลอกลิงก์</button></div></div>
+ <div class="card stack"><div class="row" style="justify-content:space-between"><h3>สถานะรายชั้น</h3><span class="small muted">เผยแพร่แล้ว ${pubN} ชั้น</span></div>
+ <div class="tw"><table><thead><tr><th>ชั้น</th><th>นักเรียน</th><th>ครูส่งผลแล้ว</th><th>สถานะ</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="empty">ยังไม่มีนักเรียน</td></tr>'}</tbody></table></div>
+ <div class="small muted">การเผยแพร่จะคัดลอกผล ณ เวลาที่กดไปให้นักเรียนดู หากครูแก้คะแนนภายหลัง ชั้นนั้นจะขึ้นสถานะ “มีการแก้ไขหลังเผยแพร่” ให้กดเผยแพร่ใหม่อีกครั้ง · นักเรียนเข้าดูด้วยเลขประจำตัวนักเรียน</div></div></div>`;};
+reg('click',e=>{const t=e.target.closest('[data-pub],[data-unpub],[data-pubopt],[data-act=pubcopy]');if(!t||!$('#view'))return;const d=t.dataset;
+ if(d.pub)pubLevel(d.pub);else if(d.unpub)unpubLevel(d.unpub);else if(d.pubopt)pubSetOpt(d.pubopt,d.v==='1');
+ else if(d.act==='pubcopy'){try{navigator.clipboard.writeText(location.origin+'/student');toast('คัดลอกลิงก์แล้ว');}catch(err){toast(location.origin+'/student');}}});
+reg('change',e=>{const t=e.target;if(t.dataset&&t.dataset.pubchk)pubSetOpt(t.dataset.pubchk,t.checked);});
 const PRI_L=['ป.1','ป.2','ป.3','ป.4','ป.5','ป.6'];
 reg('click',e=>{const t=e.target.closest('[data-rl],[data-act=rdl]');if(!t)return;const d=t.dataset;
  if(d.rl){S.rpLevel=d.rl;S.rpStu=null;render();}
@@ -686,9 +769,15 @@ function sumData(L) {
   const rows = D.stus.map((s) => {
     const rs = D.cal.map((x) => x.R.find((q) => q.s.id === s.id))
     const cells = rs.map((r) => (M === 'p1' ? (r.cur == null ? '' : Math.round(r.cur * 10) / 10) : (r.g == null ? '' : r.g)))
-    const gn = rs.map((r) => r.g).filter((g) => typeof g === 'number')
+    // ช่องว่าง = ยังคำนวณเกรดไม่ได้ เพราะคะแนนยังไม่ครบ (ระบุว่าขาดส่วนไหน)
+    const miss = rs.map((r) => (r.g != null && M !== 'p1') || (M === 'p1' && r.cur != null) ? '' :
+      [r.mid == null ? 'คะแนนเก็บ' : '', r.fin == null ? 'คะแนนสอบปลายภาค' : '', M === 'p2' && r.pr == null && r.cur != null ? 'คะแนนภาคเรียนที่ 1' : ''].filter(Boolean).join(' และ ') || 'คะแนน')
+    // GPA ถ่วงด้วยหน่วยกิต/น้ำหนัก และใช้ผลแก้ตัว (ถ้ามี) แบบเดียวกับใบแจ้งผล
+    const eff = D.cal.map((x, i) => { const fx = ((S.fix[x.c.code + '|' + D.T] || {})[s.id] || {}).after, a = String(fx ?? '').trim(); return a !== '' && !isNaN(+a) ? +a : (typeof rs[i].g === 'number' ? rs[i].g : null) })
+    const wt = D.cal.map((x) => credOf(x.c.code, D.T, D.pri))
+    const gi = eff.map((g, i) => [g, wt[i]]).filter(([g]) => g != null), wsum = gi.reduce((a, [, w]) => a + w, 0)
     const ap = rs.filter((r) => r.pct != null)
-    return { s, cells, gpa: M === 'p1' ? null : (gn.length ? gn.reduce((a, b) => a + b, 0) / gn.length : null),
+    return { s, cells, miss, gpa: M === 'p1' ? null : (wsum ? gi.reduce((a, [g, w]) => a + g * w, 0) / wsum : null),
       att: ap.length ? ap.reduce((a, r) => a + r.pct, 0) / ap.length : null,
       ms: rs.filter((r) => r.g === 'มส').length, ro: rs.filter((r) => r.g === 'ร').length,
       acts: ACTS.map((a) => actOf(s, a)) }
@@ -700,7 +789,8 @@ function sumTable(L, forPrint) {
   const { D, rows, M } = sumData(L), sh = (c) => c.name.replace(/\s+\d+$/, '')
   const head = D.cal.map((x) => (forPrint ? `<th class="rot"><span class="rv">${esc(x.c.code)} ${esc(sh(x.c))}</span></th>` : `<th title="${esc(x.c.name)}">${esc(x.c.code)}<br><span class="small">${esc(sh(x.c))}</span></th>`)).join('')
   const ah = ACTS.map((a) => (forPrint ? `<th class="rot"><span class="rv">${esc(a.length > 14 ? a.slice(0, 14) + '…' : a)}</span></th>` : `<th>${esc(a.length > 12 ? a.slice(0, 12) + '…' : a)}</th>`)).join('')
-  const body = rows.map((r) => `<tr><td class="num">${r.s.no}</td><td>${esc(r.s.name)}</td>${r.cells.map((c) => `<td class="num">${c}</td>`).join('')}<td class="num">${r.gpa == null ? '-' : r.gpa.toFixed(2)}</td><td class="num">${r.att == null ? '-' : r.att.toFixed(0)}</td>${r.acts.map((a) => `<td class="num">${a}</td>`).join('')}</tr>`).join('')
+  const cell = (c, i, r) => (c !== '' ? c : forPrint ? '-' : `<span class="pill p-warn" title="ยังไม่มี${esc(r.miss[i])} กรอกให้ครบที่หน้าบันทึกคะแนน">ไม่ครบ</span>`)
+  const body = rows.map((r) => `<tr><td class="num">${r.s.no}</td><td>${esc(r.s.name)}</td>${r.cells.map((c, i) => `<td class="num">${cell(c, i, r)}</td>`).join('')}<td class="num">${r.gpa == null ? '-' : r.gpa.toFixed(2)}</td><td class="num">${r.att == null ? '-' : r.att.toFixed(0)}</td>${r.acts.map((a) => `<td class="num">${a}</td>`).join('')}</tr>`).join('')
   return `<table class="rt2 sumt"><thead><tr><th>ที่</th><th>ชื่อ-สกุล</th>${head}<th>${M === 'p1' ? '-' : 'GPA'}</th><th>เวลา %</th>${ah}</tr></thead><tbody>${body}</tbody></table>`
 }
 function sumPage(L) {
@@ -721,7 +811,8 @@ P.summary = () => {
   <div class="card stack"><h3>สรุปผลการเรียนรายห้อง ${L} ภาคเรียนที่ ${D.T}</h3><div class="small muted">${SUM_NOTE[M]}</div>
   ${D.stus.length && D.cal.length ? `<div class="row"><button class="btn sm" data-act="sumdl" data-f="PDF">PDF</button><button class="btn sm alt" data-act="sumdl" data-f="Excel">Excel</button></div>
   <div class="tw">${sumTable(L, false)}</div>
-  <div class="small muted">รวม มส. ${rows.reduce((a, r) => a + r.ms, 0)} รายการ · ร ${rows.reduce((a, r) => a + r.ro, 0)} รายการ</div>` : '<div class="empty">ชั้นนี้ยังไม่มีนักเรียนหรือรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}</div></div>`
+  <div class="small muted">รวม มส. ${rows.reduce((a, r) => a + r.ms, 0)} รายการ · ร ${rows.reduce((a, r) => a + r.ro, 0)} รายการ · GPA ถ่วงด้วย${D.pri ? 'น้ำหนัก' : 'หน่วยกิต'}แบบเดียวกับใบแจ้งผล</div>
+  ${(() => { const L2 = []; rows.forEach((r) => r.miss.forEach((m, i) => { if (m) L2.push(`${r.s.no}. ${esc(r.s.name)} · ${esc(D.cal[i].c.code)} ${esc(D.cal[i].c.name)}: ยังไม่มี${esc(m)}`) })); return L2.length ? `<div class="lock small"><b>คะแนนยังไม่ครบ ${L2.length} รายการ (ช่อง "ไม่ครบ" ในตาราง)</b><div style="max-height:180px;overflow:auto">${L2.join('<br>')}</div></div>` : '' })()}` : '<div class="empty">ชั้นนี้ยังไม่มีนักเรียนหรือรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}</div></div>`
 }
 function sumName(L, ext) { return `สรุปผลการเรียน_${L}_ภาคเรียน${S.term}_ปีการศึกษา${S.year}.${ext}`.replace(/[\\/:*?"<>|]/g, '') }
 function downloadSummary(f) {
@@ -838,7 +929,14 @@ reg('click', (e) => {
   else if (a === 'allpass') { const st = S.acts[d.key]; if (!claim(d.key)) return; ACT().filter((s) => s.level === d.key.split('|')[0]).forEach((s) => (st.v[s.id] = 'ผ')); render() }
   else if (a === 'release') { S.acts[d.key].owner = null; render() }
   else if (a === 'addcol') { const cf = cfgOf(S.scCode); cf.cols.push({ n: 'ช่องที่ ' + (cf.cols.length + 1), max: 0 }); render() }
-  else if (a === 'delcol') { cfgOf(S.scCode).cols.splice(+d.i, 1); render() }
+  else if (a === 'delcol') {
+    // ลบช่องคะแนนเก็บ: ลบคะแนนช่องนั้นของนักเรียนทุกคนด้วย ไม่ให้คะแนนช่องอื่นเลื่อนผิดช่อง
+    const i = +d.i, cf = cfgOf(S.scCode), sc = S.scores[TK(S.scCode)] || {}
+    const used = Object.values(sc).some((v) => v && v.c && v.c[i] !== '' && v.c[i] != null)
+    const del = () => { cf.cols.splice(i, 1); Object.values(sc).forEach((v) => { if (v && Array.isArray(v.c) && v.c.length > i) v.c.splice(i, 1) }); persist(); render() }
+    if (!used) del()
+    else ask({ title: 'ลบช่อง "' + (cf.cols[i] || {}).n + '"?', text: 'คะแนนที่กรอกไว้ในช่องนี้ของนักเรียนทุกคนจะถูกลบด้วย', ok: 'ลบช่อง', cancel: 'ไม่ลบ', danger: true }).then((y) => y && del())
+  }
   else if (a === 'dl') downloadBook(d.f)
   else if (a === 'rdl') downloadReport(d.w)
   else if (a === 'sumdl') downloadSummary(d.f)

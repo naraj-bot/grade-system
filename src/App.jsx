@@ -5,6 +5,8 @@ import { DataProvider, useData } from './data'
 import Icon from './icons'
 import { ROLE_LABEL, isAdminRole } from './lib/constants'
 import Landing from './pages/Landing'
+import StudentPortal from './pages/StudentPortal'
+import News from './pages/News'
 import ChangePassword from './pages/ChangePassword'
 import AcademicYears from './pages/AcademicYears'
 import Users from './pages/Users'
@@ -38,7 +40,9 @@ const PAGES = [
   ['/p5', 'สมุด ปพ.5', 'ปพ.5', 'print', ALL, E('p5'), 'เอกสาร'],
   ['/report', 'ใบแจ้งผลการเรียน', 'แจ้งผล', 'book', ALL, E('report'), 'เอกสาร'],
   ['/summary', 'สรุปผลรายห้อง', 'สรุปห้อง', 'book', ALL, E('summary'), 'เอกสาร'],
+  ['/publish', 'เผยแพร่ผลการเรียน', 'เผยแพร่', 'flag', ADMIN, E('publish'), 'เอกสาร'],
   ['/school', 'ตั้งค่าโรงเรียน', 'โรงเรียน', 'school', ADMIN, E('school'), 'ตั้งค่า'],
+  ['/news', 'ประกาศหน้าแรก', 'ประกาศ', 'help', ADMIN, News, 'ตั้งค่า'],
   ['/backup', 'สำรองข้อมูล', 'สำรอง', 'down', ADMIN, Backup, 'ตั้งค่า'],
   ['/sign', 'ลายเซ็นของฉัน', 'ลายเซ็น', 'pen', ALL, E('sign'), 'ตั้งค่า'],
 ]
@@ -63,7 +67,7 @@ function Shell() {
       <aside className="side">
         <div className="brand">
           <div className="crest"><img src="/logo.png" alt="" /></div>
-          <div><b>ระบบตัดเกรด</b><small>โรงเรียนวัดบางปูน</small></div>
+          <div><b>ระบบผลการเรียน</b><small>โรงเรียนวัดบางปูน</small></div>
         </div>
         {openYear && <div className="yc"><span>ปีการศึกษา <b>{openYear.year}</b></span><span className="yt">ภาคเรียนที่ {term}</span></div>}
         <nav className="nav" aria-label="เมนูหลัก">
@@ -129,7 +133,7 @@ function Shell() {
         <div className="credit-gap" />
         <footer className="credit">
           <img src="/logo.png" alt="" />
-          <div className="ct"><b>ระบบตัดเกรด · โรงเรียนวัดบางปูน</b><span>สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสิงห์บุรี</span></div>
+          <div className="ct"><b>ระบบบันทึกและประกาศผลการเรียน · โรงเรียนวัดบางปูน</b><span>สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสิงห์บุรี</span></div>
           <div className="cd">พัฒนาโดย <b>ครูซอสสอนสังคม</b></div>
         </footer>
       </div>
@@ -139,6 +143,9 @@ function Shell() {
 
 export default function App() {
   const { user, loading } = useAuth()
+  const loc = useLocation()
+  // หน้านักเรียนดูผล เปิดได้โดยไม่ต้องล็อกอิน
+  if (loc.pathname.startsWith('/student')) return <StudentPortal />
   if (loading) return <div className="center">กำลังโหลด...</div>
   if (!user) return <Landing />
   if (user.mustChangePassword) return <ChangePassword />

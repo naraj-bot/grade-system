@@ -5,7 +5,7 @@ const COLS = [['ที่', 80, 'c'], ['ชื่อผู้ใช้', 290, 'l
 
 const loadImg = (src) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src })
 
-export async function credSheetBlobs(rows, { title = 'บัญชีผู้ใช้ระบบตัดเกรด', sub = 'โรงเรียนวัดบางปูน' } = {}) {
+export async function credSheetBlobs(rows, { title = 'บัญชีผู้ใช้ระบบผลการเรียน', sub = 'โรงเรียนวัดบางปูน' } = {}) {
   try { await Promise.all([document.fonts.load('700 40px "TH SarabunPSK"'), document.fonts.load('400 40px "TH SarabunPSK"')]) } catch { /* ไม่เป็นไร */ }
   const logo = await loadImg('/logo.png')
   const pages = Math.max(1, Math.ceil(rows.length / PER)), out = []
