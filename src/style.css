@@ -192,7 +192,8 @@ details>summary{cursor:pointer}
 
 
 /* ===== ธีมสีสัน + เมนูซ้ายใหม่ ===== */
-body{background:var(--body-bg);background-attachment:fixed}
+/* พื้นหลังไล่สีวางบน html แบบปกติ (ไม่ใช้ fixed ซึ่งทำให้เบราว์เซอร์วาดใหม่ทุกครั้งที่เลื่อน) */
+html{background:#efdbd0}body{background:var(--body-bg);min-height:100vh}
 .main{display:flex;flex-direction:column;min-height:100vh}
 
 .card{background:var(--card-bg);border:1px solid var(--line);box-shadow:0 1px 2px rgba(122,22,22,.05),0 6px 18px rgba(122,22,22,.05)}
@@ -546,8 +547,6 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .nav .nd button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 /* ส่วนหัวและส่วนท้ายคงที่ ไม่เลื่อนตามเนื้อหา */
 .main>.top{position:sticky;top:8px;z-index:30}
-/* แผ่นพื้นหลังรองหัวหน้า: ปิดเนื้อหาที่เลื่อนผ่านทั้งด้านบน มุมโค้ง และใต้แถบหัว */
-.main>.top::before{content:"";position:absolute;left:-16px;right:-16px;top:-8px;bottom:-14px;background:var(--body-bg,var(--bg));background-attachment:fixed;z-index:-1;-webkit-mask-image:linear-gradient(#000 calc(100% - 14px),transparent);mask-image:linear-gradient(#000 calc(100% - 14px),transparent)}
 @media (min-width:821px){.main>.credit{position:sticky;bottom:0;z-index:30}}
 /* ความคืบหน้ารายครู */
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
@@ -570,4 +569,5 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .xbtn{all:unset;cursor:pointer;width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;line-height:1}.xbtn:hover{background:rgba(0,0,0,.1)}
 /* เลื่อนหน้าให้ลื่น: แยกเลเยอร์ของส่วนที่ค้างอยู่ */
 .main>.top,.main>.credit{will-change:transform;transform:translateZ(0)}
-.main>.top{box-shadow:0 4px 12px rgba(122,22,22,.18)}
+/* แถบหัวค้างด้านบน: ใช้เงาทึบสีพื้นปิดช่องว่างเหนือแถบ (เบากว่าแผ่นพื้นหลังแบบ fixed + mask ที่ทำให้สีแถบจางและเลื่อนอืด) */
+.main>.top{box-shadow:0 4px 12px rgba(122,22,22,.18),0 -12px 0 4px var(--bg)}
