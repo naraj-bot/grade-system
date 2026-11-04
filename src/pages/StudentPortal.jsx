@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { printCss } from '../engine/printcss'
+import InstallButton from '../components/InstallButton'
 
 // นักเรียนดูผลการเรียน (ไม่ต้องล็อกอิน): กรอกเลขประจำตัวด้วยแป้นตัวเลข → ขอผลจาก /api/student-result
 const KEY = 'stuResult'
@@ -153,7 +154,7 @@ export default function StudentPortal() {
       {stu ? <ResultView stu={stu} onLogout={logout} onTerm={term} busy={busy} /> : (
         <div className="sp-login">
           <div className="sp-head">
-            <button type="button" className="sp-back" onClick={() => nav('/')}>‹ หน้าแรก</button>
+            <div className="sp-headrow"><button type="button" className="sp-back" onClick={() => nav('/')}>‹ หน้าแรก</button><InstallButton className="sp-install" /></div>
             <div className="sp-brand">
               <img src="/logo.png" alt="ตราโรงเรียนวัดบางปูน" />
               <div><b>นักเรียนดูผลการเรียน</b><span>ระบบผลการเรียน · โรงเรียนวัดบางปูน</span></div>

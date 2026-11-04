@@ -4,6 +4,7 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
 import Login from './Login'
 import { StudentKeypad, saveStu } from './StudentPortal'
+import InstallButton from '../components/InstallButton'
 
 // หน้าแรก (ยังไม่ล็อกอิน) จบในหน้าเดียว: ชื่อระบบ ปุ่มนักเรียน/ครู สถานะประกาศผล และประกาศล่าสุด
 const OFFICE = 'สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสิงห์บุรี'
@@ -83,7 +84,7 @@ export default function Landing() {
           <img src="/logo.png" alt="ตราโรงเรียนวัดบางปูน" />
           <div><b>โรงเรียนวัดบางปูน</b><span>{OFFICE}</span></div>
         </div>
-        <button type="button" className="ld-teach" onClick={() => setShowLogin(true)}>ครู / บุคลากร เข้าสู่ระบบ</button>
+        <div className="ld-acts"><InstallButton /><button type="button" className="ld-teach" onClick={() => setShowLogin(true)}>ครู / บุคลากร เข้าสู่ระบบ</button></div>
       </header>
       <main className="ld-main">
         <div className="ld-hero">

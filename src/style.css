@@ -525,3 +525,11 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 @media (prefers-reduced-motion:reduce){.ld-hero>*,.ld-card,.ld-badge i{animation:none}.ld-cta,.ld-cta svg{transition:none}}
 /* เติมบรรทัดแรกให้เต็มก่อน: ตัดบรรทัดตามปกติ ส่วนการกันคำตกใช้การจับวลี (phrases) แทน */
 .ld-title{text-wrap:wrap}
+
+/* ติดตั้งแอป (PWA) */
+.ld-acts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ld-install{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:0 18px;border-radius:999px;border:1px solid rgba(243,210,122,.55);background:rgba(243,210,122,.1);color:#f3d27a;font:600 15px var(--f-display);cursor:pointer;white-space:nowrap}
+.ld-install:hover{background:rgba(243,210,122,.18)}
+.sp-headrow{display:flex;justify-content:space-between;align-items:center}
+.sp-install{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(243,210,122,.55);background:transparent;color:#f3d27a;font:600 14px var(--f-display);cursor:pointer}
+.pwa-steps{margin:0;padding-left:22px;display:grid;gap:10px;font-size:15px;line-height:1.6}
