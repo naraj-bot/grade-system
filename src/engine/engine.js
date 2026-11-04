@@ -284,6 +284,8 @@ P.scores=()=>{
  <div class="tw hd"><table><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th>${cfg.cols.map(k=>`<th>${esc(k.n)} /${k.max}</th>`).join('')}<th>รวมระหว่างภาค</th><th>ปลายภาค /${F.fin}</th><th>ชั่วโมงที่ขาด (ชม.)</th><th>เวลาเรียน %</th>${(!pri||t2)?'<th>ร</th>':''}${head}</tr></thead><tbody>${rows}</tbody></table></div>${(!pri||t2)?nextBtn(c,R,'scores:'):''}</div>`;
 };
 const ACTS=['ชุมนุม','แนะแนว','ลูกเสือ-เนตรนารี','กิจกรรมเพื่อสังคมและสาธารณประโยชน์'];
+// ประถม: กิจกรรมพัฒนาผู้เรียนทุกกิจกรรมตัดสินเมื่อจบภาคเรียนที่ 2 (ภาคเรียนที่ 1 ยังตัดสินไม่ได้)
+const actLockT=L=>isPri(L)&&S.term===1;
 P.acts=()=>{
  const L=S.actLevel,stu=ACT().filter(s=>s.level===L),hr=HOMEROOM[L]||[];
  const guidanceTeacher=S.guidance!=='none'&&S.guidance;
@@ -297,8 +299,8 @@ P.acts=()=>{
   return `<div class="card stack"><div class="row" style="justify-content:space-between"><h3>${a}</h3><span class="small muted">ผู้ตัดสิน: ${who(a)}</span></div>
   ${!can?'<div class="lock small">กิจกรรมนี้ไม่ใช่หน้าที่ของคุณ</div>':locked?`<div class="lock small">${esc(USERS[st.owner].name)} กรอกกิจกรรมนี้ของห้อง ${L} แล้ว คุณกรอกซ้ำไม่ได้</div>`:
    `${st.owner?`<div class="small muted">กรอกโดย ${esc(USERS[st.owner].name)} ${isAdmin()?`<button class="btn sm alt" data-act="release" data-key="${esc(key)}">ปล่อยสิทธิ์</button>`:''}</div>`:''}
-   <div class="row"><button class="btn sm" data-act="allpass" data-key="${esc(key)}">ผ่านทั้งห้อง</button></div>
-   <div class="tw"><table><thead><tr><th>ชื่อ</th><th>ผล</th></tr></thead><tbody>${stu.map(s=>`<tr><td>${esc(s.name)}</td><td><select data-av="${esc(key)}" data-s="${s.id}" aria-label="ผลของ ${esc(s.name)}"><option value="">-</option><option ${st.v[s.id]==='ผ'?'selected':''}>ผ</option><option ${st.v[s.id]==='มผ'?'selected':''}>มผ</option></select></td></tr>`).join('')}</tbody></table></div>`}</div>`;}).join('')}
+   ${actLockT(L)?'<div class="lock small">ประถมตัดสินผลกิจกรรมพัฒนาผู้เรียนเมื่อจบภาคเรียนที่ 2 (ผลทั้งปี) <button class="btn sm alt" data-term="2">ไปภาคเรียนที่ 2</button></div>':`<div class="row"><button class="btn sm" data-act="allpass" data-key="${esc(key)}">ผ่านทั้งห้อง</button></div>`}
+   <div class="tw"><table><thead><tr><th>ชื่อ</th><th>ผล</th></tr></thead><tbody>${stu.map(s=>`<tr><td>${esc(s.name)}</td><td>${actLockT(L)?'<span class="small muted">ตัดสินภาคเรียนที่ 2</span>':`<select data-av="${esc(key)}" data-s="${s.id}" aria-label="ผลของ ${esc(s.name)}"><option value="">-</option><option ${st.v[s.id]==='ผ'?'selected':''}>ผ</option><option ${st.v[s.id]==='มผ'?'selected':''}>มผ</option></select>`}</td></tr>`).join('')}</tbody></table></div>`}</div>`;}).join('')}
  ${clubsHtml()}</div>`;
 };
 function teacherOf(code){const r=S.regs.find(x=>x.status==='ok'&&x.codes.includes(code));return r?USERS[r.t].name:me().name;}
@@ -318,7 +320,7 @@ function teacherKeyOf(code){const r=S.regs.find(x=>x.status==='ok'&&x.codes.incl
 function metaOf(code){const m=S.meta[code]||(S.meta[code]={desc:'',img:null,units:{}});return m;}
 function groupsOf(cfg){const g=[];cfg.cols.forEach((k,i)=>{const u=(k.u||'').trim(),last=g[g.length-1];if(u&&last&&last.u===u){last.idx.push(i);last.max+=+k.max||0;}else g.push({u,label:u||k.n,idx:[i],max:+k.max||0});});return g;}
 const gsum=(r,g)=>{const v=g.idx.map(i=>r.v.c[i]).filter(x=>x!==''&&x!=null);return v.length?v.reduce((p,q)=>p+(+q),0):null;};
-const sigImg=s=>s?`<img class="sigimg" src="${s}" alt="ลายเซ็น">`:'';
+const sigImg=s=>s?`<span class="sigln"><img class="sigimg" src="${s}" alt="ลายเซ็น"></span>`:'';
 function getSig(t){const [k,id]=t.split(':');return k==='u'?S.sigs[id]:k==='o'?S.school.officers[id].sig:(S.school.heads[id]||{}).sig;}
 function setSig(t,v){const [k,id]=t.split(':');if(k==='u')S.sigs[id]=v;else if(k==='o')S.school.officers[id].sig=v;else(S.school.heads[id]=S.school.heads[id]||{name:''}).sig=v;}
 P.p5=()=>{
@@ -513,13 +515,19 @@ function sigWidget(target,label){const cur=getSig(target);
  return `<div class="card stack"><b>${label}</b>${cur?`<img class="sigprev" src="${cur}" alt="ลายเซ็นปัจจุบัน">`:'<div class="small muted">ยังไม่มีลายเซ็น</div>'}
  <canvas class="sigc" data-target="${target}" width="520" height="170" aria-label="กรอบวาดลายเซ็น"></canvas>
  <div class="row"><button class="btn sm" data-act="sigsave" data-target="${target}">บันทึกลายเซ็นที่วาด</button><button class="btn sm alt" data-act="sigclear" data-target="${target}">ล้างกรอบ</button>
- <label class="btn sm alt" style="cursor:pointer">แนบภาพลายเซ็น<input type="file" accept="image/*" data-sigfile="${target}" hidden></label>${cur?`<button class="btn sm alt" data-act="sigdel" data-target="${target}">ลบลายเซ็น</button>`:''}</div>
+ <label class="btn sm alt" style="cursor:pointer">แนบภาพลายเซ็น<input type="file" accept="image/*" data-sigfile="${target}" hidden></label>${cur?`<button class="btn sm alt" data-act="sigclean" data-target="${target}">ลบพื้นหลังลายเซ็นเดิม</button><button class="btn sm alt" data-act="sigdel" data-target="${target}">ลบลายเซ็น</button>`:''}</div>
  <div class="small muted">วาดด้วยนิ้ว เมาส์ หรือปากกา หรือแนบภาพลายเซ็น (พื้นขาวหรือโปร่งใส)</div></div>`;}
 function initSig(){document.querySelectorAll('canvas.sigc').forEach(cv=>{const x=cv.getContext('2d');x.lineWidth=3;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#14213d';let on=false;
  const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height];};
  cv.onpointerdown=e=>{on=true;cv.setPointerCapture(e.pointerId);const [a,b]=pos(e);x.beginPath();x.moveTo(a,b);x.lineTo(a+.1,b+.1);x.stroke();cv._dirty=true;e.preventDefault();};
  cv.onpointermove=e=>{if(!on)return;const [a,b]=pos(e);x.lineTo(a,b);x.stroke();};
  cv.onpointerup=cv.onpointercancel=()=>{on=false;};});}
+function cleanSig(url,cb){const im=new Image();im.onload=()=>{const W=im.width,Hh=im.height,cv=document.createElement('canvas');cv.width=W;cv.height=Hh;const x=cv.getContext('2d');x.drawImage(im,0,0);
+ const d=x.getImageData(0,0,W,Hh),p=d.data;let x0=W,y0=Hh,x1=-1,y1=-1;
+ for(let i=0;i<p.length;i+=4){const a0=p[i+3]/255,l=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2],a=Math.max(0,Math.min(1,(235-l)/85))*a0;
+  p[i+3]=Math.round(a*255);if(a>0){const k=i/4,xx=k%W,yy=(k-xx)/W;p[i]=Math.min(p[i],90);p[i+1]=Math.min(p[i+1],90);p[i+2]=Math.min(p[i+2],120);if(a>.2){if(xx<x0)x0=xx;if(xx>x1)x1=xx;if(yy<y0)y0=yy;if(yy>y1)y1=yy;}}}
+ x.putImageData(d,0,0);if(x1<0)return cb(url);const pad=6;x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(W-1,x1+pad);y1=Math.min(Hh-1,y1+pad);
+ const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;o.getContext('2d').drawImage(cv,x0,y0,o.width,o.height,0,0,o.width,o.height);cb(o.toDataURL('image/png'));};im.onerror=()=>cb(url);im.src=url;}
 function readImg(file,max,type,cb){const fr=new FileReader();fr.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);const x=cv.getContext('2d');if(type==='jpeg'){x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);}x.drawImage(im,0,0,cv.width,cv.height);cb(cv.toDataURL('image/'+type,.88));};im.src=fr.result;};fr.readAsDataURL(file);}
 P.sign=()=>`<div class="stack"><div class="card"><b>ลายเซ็นของฉัน (${esc(me().name)})</b><div class="small muted">ใช้ลงชื่อในสมุด ปพ.5 เมื่อกด "ลงลายมือชื่อครูผู้สอน" ในหน้าสมุด ปพ.5 ลายเซ็นเก็บเฉพาะบัญชีของคุณ</div></div>${sigWidget('u:'+S.role,'วาดหรือแนบลายเซ็น')}</div>`;
 P.school=()=>{const sc=S.school,o=sc.officers;
@@ -549,7 +557,8 @@ P.eval=()=>{const codes=pickSubject();
 reg('click',e=>{const t=e.target.closest('[data-evk],[data-act]');if(!t)return;const d=t.dataset,a=d.act;
  if(d.evk){S.evKind=d.evk;render();return;}
  if(a==='sigclear'){const cv=document.querySelector(`canvas.sigc[data-target="${d.target}"]`);cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv._dirty=false;}
- else if(a==='sigsave'){const cv=document.querySelector(`canvas.sigc[data-target="${d.target}"]`);if(!cv._dirty)return toast('วาดลายเซ็นในกรอบก่อน');setSig(d.target,cv.toDataURL('image/png'));toast('บันทึกลายเซ็นแล้ว');render();}
+ else if(a==='sigsave'){const cv=document.querySelector(`canvas.sigc[data-target="${d.target}"]`);if(!cv._dirty)return toast('วาดลายเซ็นในกรอบก่อน');cleanSig(cv.toDataURL('image/png'),u=>{setSig(d.target,u);toast('บันทึกลายเซ็นแล้ว');render();});}
+  else if(a==='sigclean'){const cur=getSig(d.target);if(cur)cleanSig(cur,u=>{setSig(d.target,u);toast('ลบพื้นหลังลายเซ็นแล้ว');render();});}
  else if(a==='sigdel'){setSig(d.target,null);render();}
  else if(a==='descdel'){metaOf(S.scCode).img=null;render();}
  else if(a==='holadd'){const f=$('#hf').value,e2=$('#ht').value;if(!f)return toast('เลือกวันที่หยุดก่อน');if(e2&&e2<f)return toast('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม');calOf().hol.push({f,t:e2||f,n:($('#hn').value||'').trim()});render();}
@@ -561,7 +570,7 @@ reg('click',e=>{const t=e.target.closest('[data-evk],[data-act]');if(!t)return;c
 reg('change',e=>{const t=e.target,d=t.dataset;
  if(t.id==='desc'){metaOf(S.scCode).desc=t.value;}
  else if(t.id==='descimg'&&t.files[0]){readImg(t.files[0],1200,'jpeg',u=>{metaOf(S.scCode).img=u;render();});}
- else if(d.sigfile!==undefined&&t.files[0]){readImg(t.files[0],520,'png',u=>{setSig(d.sigfile,u);toast('แนบลายเซ็นแล้ว');render();});}
+ else if(d.sigfile!==undefined&&t.files[0]){readImg(t.files[0],520,'png',u=>cleanSig(u,v=>{setSig(d.sigfile,v);toast('แนบลายเซ็นแล้ว (ลบพื้นหลังให้แล้ว)');render();}));}
  else if(d.std!==undefined||d.hrsu!==undefined){const raw=String(d.std!==undefined?d.std:d.hrsu),T=raw.includes(':')?1:S.term,g=groupsOf(cfgOf(S.scCode,T))[+raw.split(':').pop()],m=metaOf(S.scCode),u=(m.units[uk(T,g.label)]=m.units[uk(T,g.label)]||{});if(d.std!==undefined)u.std=t.value;else u.hrs=t.value;render();}
  else if(d.fw!==undefined||d.fa!==undefined||d.fd!==undefined){const sid=d.fw??d.fa??d.fd,f=S.fix[SKEY()]||(S.fix[SKEY()]={}),x=f[sid]||(f[sid]={});if(d.fw!==undefined)x.why=t.value;else if(d.fa!==undefined)x.after=t.value;else x.date=t.value;render();}
  else if(d.sg){const s=S.sign[SKEY()]||(S.sign[SKEY()]={});s[d.sg]=t.checked;render();}
@@ -734,21 +743,34 @@ function stickNames(){document.querySelectorAll('#view .tw').forEach(w=>{const t
  const th=[...h.children],i=th.findIndex(x=>/ชื่อ/.test(x.textContent)&&!(x.colSpan>1));if(i<0||i>1)return;
  w.classList.add('stk');w.classList.toggle('stk1',i===0);w.style.setProperty('--w0',th[0].offsetWidth+'px');});}
 /* ---------- ชุมนุม ---------- */
+function clubOfStu(id, except) { return Object.entries(S.members).find(([n, m]) => n !== except && (m.ids || []).includes(id)) }
+// ประถมตัดสินผลกิจกรรมเมื่อจบภาคเรียนที่ 2 (ผลทั้งปี) ภาคเรียนที่ 1 จัดสมาชิกได้แต่ยังตัดสินไม่ได้
+const clubJudge = (s) => !(isPri(s.level) && S.term === 1)
 function clubsHtml() {
   const admin = isAdmin(), clubs = Object.entries(S.members).sort((a, b) => a[0].localeCompare(b[0], 'th'))
   const L = S.clubLv, pool = ACT().filter((s) => s.level === L)
+  const tOpts = (cur) => TEACHERS.map((t) => `<option value="${t.uid}" ${cur === t.uid ? 'selected' : ''}>${esc(t.name)}</option>`).join('')
+  const dup = ACT().map((s) => [s, Object.entries(S.members).filter(([, m]) => (m.ids || []).includes(s.id)).map(([n]) => n)]).filter(([, a]) => a.length > 1)
   return `<div class="card stack"><h3>ชุมนุม</h3>
-  <div class="small muted">ครูผู้สอนชุมนุมเป็นผู้ตัดสิน เลือกสมาชิกจากนักเรียนทั้งโรงเรียน (ทีละคนหรือหลายคน) แล้วตัดสินเฉพาะสมาชิก</div>
-  <div class="row"><input id="clubn" placeholder="ชื่อชุมนุมใหม่ เช่น ชุมนุมศิลปะ" size="26"><button class="btn sm" data-act="newclub">สร้างชุมนุม</button></div>
+  <div class="small muted">แอดมินสร้างชุมนุมและมอบหมายครูผู้สอนได้ · ครูสร้างชุมนุมของตนเองได้ · ครูผู้สอนชุมนุมเลือกสมาชิกและตัดสินผล · นักเรียน 1 คนอยู่ได้ 1 ชุมนุม${S.term === 1 ? ' · <b>ประถมตัดสินผลชุมนุมในภาคเรียนที่ 2</b> (ภาคเรียนที่ 1 จัดสมาชิกไว้ก่อนได้)' : ''}</div>
+  <div class="row"><input id="clubn" placeholder="ชื่อชุมนุมใหม่ เช่น ชุมนุมศิลปะ" size="26">${admin ? `<select id="clubt" aria-label="ครูผู้สอนชุมนุม"><option value="">ครูผู้สอน: ตัวฉันเอง</option>${tOpts('')}</select>` : ''}<button class="btn sm" data-act="newclub">สร้างชุมนุม</button></div>
+  ${dup.length ? `<div class="lock small"><b>นักเรียนอยู่มากกว่า 1 ชุมนุม ${dup.length} คน</b> — ให้เอาออกจากชุมนุมที่ไม่ใช่<br>${dup.map(([s, a]) => `${esc(s.level)} ${esc(s.name)}: ${a.map(esc).join(', ')}`).join('<br>')}</div>` : ''}
   ${clubs.map(([name, m]) => {
-    const mine = m.owner === S.role || admin
-    if (!mine) return `<div class="lock small">${esc(name)} — ผู้ตัดสิน: ${esc(USERS[m.owner].name)} (ไม่ใช่ชุมนุมของคุณ)</div>`
-    const members = STU.filter((s) => (m.ids || []).includes(s.id))
-    return `<div class="card stack" style="background:var(--bg,#fff)"><div class="row" style="justify-content:space-between"><b>${esc(name)}</b><span class="small muted">ผู้ตัดสิน: ${esc(USERS[m.owner].name)}</span></div>
+    const mine = m.owner === S.role || admin, ids = m.ids || []
+    if (!mine) return `<div class="lock small">${esc(name)} — ครูผู้สอน: ${esc(USERS[m.owner].name)} · สมาชิก ${ids.length} คน (ไม่ใช่ชุมนุมของคุณ)</div>`
+    const members = STU.filter((s) => ids.includes(s.id)).sort((a, b) => a.level.localeCompare(b.level, 'th') || (a.no || 0) - (b.no || 0))
+    const chips = pool.map((s) => { const on = ids.includes(s.id), o = on ? null : clubOfStu(s.id, name)
+      return `<button class="chip mem${o ? ' taken' : ''}" aria-pressed="${on}" data-mem="${s.id}" data-club="${esc(name)}" title="${o ? 'อยู่ชุมนุม ' + esc(o[0]) + ' แล้ว' : ''}">${esc(s.name)}${o ? ` <small>· ${esc(o[0])}</small>` : ''}</button>` }).join('')
+    const judgeable = members.filter(clubJudge).length
+    return `<div class="card stack" style="background:var(--bg,#fff)"><div class="row" style="justify-content:space-between"><b>${esc(name)}</b>
+    <span class="small muted">ครูผู้สอน: ${admin ? `<select data-clubowner="${esc(name)}" aria-label="ครูผู้สอนชุมนุม ${esc(name)}">${TEACHERS.some((t) => t.uid === m.owner) ? '' : `<option value="${m.owner}" selected>${esc(USERS[m.owner].name)}</option>`}${tOpts(m.owner)}</select>` : esc(USERS[m.owner].name)}</span></div>
     <div class="row">${LEVELS.map((l) => `<button class="chip" aria-pressed="${l === L}" data-clublv="${l}">${l}</button>`).join('')}</div>
-    <div class="mgrid">${pool.map((s) => `<button class="chip mem" aria-pressed="${(m.ids || []).includes(s.id)}" data-mem="${s.id}" data-club="${esc(name)}">${esc(s.name)}</button>`).join('') || '<span class="small muted">ไม่มีนักเรียนในชั้นนี้</span>'}</div>
-    <div class="small">สมาชิก ${members.length} คน <button class="btn sm alt" data-act="clubpass" data-club="${esc(name)}">ผ่านทั้งชุมนุม</button> <button class="btn sm alt" data-act="delclub" data-club="${esc(name)}">ลบชุมนุม</button></div>
-    ${members.length ? `<div class="tw"><table><thead><tr><th>ชื่อ</th><th>ชั้น</th><th>ผล</th></tr></thead><tbody>${members.map((s) => `<tr><td>${esc(s.name)}</td><td>${s.level}</td><td><select data-cv="${s.id}" data-club="${esc(name)}" aria-label="ผลของ ${esc(s.name)}"><option value="">-</option><option ${(m.v || {})[s.id] === 'ผ' ? 'selected' : ''}>ผ</option><option ${(m.v || {})[s.id] === 'มผ' ? 'selected' : ''}>มผ</option></select></td></tr>`).join('')}</tbody></table></div>` : ''}</div>`
+    <div class="mgrid">${chips || '<span class="small muted">ไม่มีนักเรียนในชั้นนี้</span>'}</div>
+    <div class="row small">สมาชิก ${members.length} คน
+      ${pool.length ? `<button class="btn sm alt" data-act="cluballlv" data-club="${esc(name)}">เลือกทั้งชั้น ${L}</button><button class="btn sm alt" data-act="clubnonelv" data-club="${esc(name)}">เอาออกทั้งชั้น ${L}</button>` : ''}
+      ${judgeable ? `<button class="btn sm alt" data-act="clubpass" data-club="${esc(name)}">ผ่านทั้งชุมนุม</button>` : ''}
+      <button class="btn sm alt" data-act="delclub" data-club="${esc(name)}">ลบชุมนุม</button></div>
+    ${members.length ? `<div class="tw"><table><thead><tr><th>ชื่อ</th><th>ชั้น</th><th>ผล</th></tr></thead><tbody>${members.map((s) => `<tr><td>${esc(s.name)}</td><td>${s.level}</td><td>${clubJudge(s) ? `<select data-cv="${s.id}" data-club="${esc(name)}" aria-label="ผลของ ${esc(s.name)}"><option value="">-</option><option ${(m.v || {})[s.id] === 'ผ' ? 'selected' : ''}>ผ</option><option ${(m.v || {})[s.id] === 'มผ' ? 'selected' : ''}>มผ</option></select>` : '<span class="small muted">ตัดสินภาคเรียนที่ 2</span>'}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>`
   }).join('') || '<div class="small muted">ยังไม่มีชุมนุม</div>'}</div>`
 }
 function homeroomCard() {
@@ -921,12 +943,27 @@ reg('click', (e) => {
   if (d.actlv) { S.actLevel = d.actlv; render(); return }
   if (d.clublv) { S.clubLv = d.clublv; render(); return }
   if (d.hr) { const a = (HOMEROOM[d.hr] = HOMEROOM[d.hr] || []), i = a.indexOf(d.uid); if (i < 0) { if (a.length >= 2) return toast('ที่ปรึกษาห้องละไม่เกิน 2 คน'); a.push(d.uid) } else a.splice(i, 1); render(); return }
-  if (d.mem) { const m = S.members[d.club]; m.ids = m.ids || []; const k = m.ids.indexOf(d.mem); k < 0 ? m.ids.push(d.mem) : (m.ids.splice(k, 1), m.v && delete m.v[d.mem]); render(); return }
+  if (d.mem) {
+    const m = S.members[d.club]; m.ids = m.ids || []; const k = m.ids.indexOf(d.mem)
+    if (k >= 0) { m.ids.splice(k, 1); m.v && delete m.v[d.mem]; render(); return }
+    const o = clubOfStu(d.mem, d.club), s = STU.find((x) => x.id === d.mem)
+    if (!o) { m.ids.push(d.mem); render(); return }
+    // นักเรียนชนกับชุมนุมอื่น: แจ้งเตือนและให้เลือกว่าจะย้ายหรือไม่
+    ask({ title: 'นักเรียนอยู่ชุมนุมอื่นแล้ว', text: `${s ? s.name : ''} อยู่ "${o[0]}" (ครูผู้สอน: ${USERS[o[1].owner].name}) แล้ว\n\nย้ายมา "${d.club}" ไหม? รายชื่อและผลในชุมนุมเดิมจะถูกลบ`, ok: 'ย้ายมาชุมนุมนี้', cancel: 'ไม่ย้าย' })
+      .then((y) => { if (!y) return; const om = S.members[o[0]]; om.ids = (om.ids || []).filter((x) => x !== d.mem); om.v && delete om.v[d.mem]; if (!m.ids.includes(d.mem)) m.ids.push(d.mem); render() })
+    return
+  }
   const a = d.act
-  if (a === 'newclub') { const n = ($('#clubn').value || '').trim(); if (!n) return toast('พิมพ์ชื่อชุมนุม'); if (S.members[n]) return toast('มีชุมนุมชื่อนี้แล้ว'); S.members[n] = { owner: S.role, ids: [], v: {} }; render() }
+  if (a === 'newclub') { const n = ($('#clubn').value || '').trim(); if (!n) return toast('พิมพ์ชื่อชุมนุม'); if (S.members[n]) return toast('มีชุมนุมชื่อนี้แล้ว'); const ow = (isAdmin() && $('#clubt') && $('#clubt').value) || S.role; S.members[n] = { owner: ow, ids: [], v: {} }; if (ow !== S.role) notify(ow, `${me().name} มอบหมายให้คุณเป็นครูผู้สอนชุมนุม "${n}"`, 'acts'); render() }
   else if (a === 'delclub') { const m = S.members[d.club]; if (m) ask({ title: 'ลบชุมนุม "' + d.club + '" ?', text: 'รายชื่อนักเรียนและผลของชุมนุมนี้จะถูกลบ', ok: 'ลบชุมนุม', danger: true }).then((y) => { if (y) { delete S.members[d.club]; render(); persist() } }) }
-  else if (a === 'clubpass') { const m = S.members[d.club]; m.v = m.v || {}; (m.ids || []).forEach((id) => (m.v[id] = 'ผ')); render() }
-  else if (a === 'allpass') { const st = S.acts[d.key]; if (!claim(d.key)) return; ACT().filter((s) => s.level === d.key.split('|')[0]).forEach((s) => (st.v[s.id] = 'ผ')); render() }
+  else if (a === 'clubpass') { const m = S.members[d.club]; m.v = m.v || {}; (m.ids || []).forEach((id) => { const s = STU.find((x) => x.id === id); if (s && clubJudge(s)) m.v[id] = 'ผ' }); render() }
+  else if (a === 'cluballlv' || a === 'clubnonelv') {
+    const m = S.members[d.club]; m.ids = m.ids || []; const pool = ACT().filter((s) => s.level === S.clubLv)
+    if (a === 'clubnonelv') { pool.forEach((s) => { m.ids = m.ids.filter((x) => x !== s.id); m.v && delete m.v[s.id] }); render(); return }
+    let skip = 0; pool.forEach((s) => { if (m.ids.includes(s.id)) return; if (clubOfStu(s.id, d.club)) { skip++; return } m.ids.push(s.id) })
+    render(); if (skip) toast(`เพิ่มแล้ว · ข้าม ${skip} คนที่อยู่ชุมนุมอื่น (กดที่ชื่อเพื่อย้าย)`)
+  }
+  else if (a === 'allpass') { if (actLockT(d.key.split('|')[0])) return toast('ประถมตัดสินผลกิจกรรมในภาคเรียนที่ 2'); const st = S.acts[d.key]; if (!claim(d.key)) return; ACT().filter((s) => s.level === d.key.split('|')[0]).forEach((s) => (st.v[s.id] = 'ผ')); render() }
   else if (a === 'release') { S.acts[d.key].owner = null; render() }
   else if (a === 'addcol') { const cf = cfgOf(S.scCode); cf.cols.push({ n: 'ช่องที่ ' + (cf.cols.length + 1), max: 0 }); render() }
   else if (a === 'delcol') {
@@ -1018,8 +1055,9 @@ reg('change', (e) => {
     if (t.dataset.i === 'f') row.f = x; else row.c[+t.dataset.i] = x
     render()
   }
-  else if (t.dataset.av) { const st = S.acts[t.dataset.av]; if (!claim(t.dataset.av)) { render(); return } st.v[t.dataset.s] = t.value }
-  else if (t.dataset.cv) { const m = S.members[t.dataset.club]; m.v = m.v || {}; m.v[t.dataset.cv] = t.value }
+  else if (t.dataset.av) { if (actLockT(t.dataset.av.split('|')[0])) { render(); return } const st = S.acts[t.dataset.av]; if (!claim(t.dataset.av)) { render(); return } st.v[t.dataset.s] = t.value }
+  else if (t.dataset.cv) { const m = S.members[t.dataset.club]; m.v = m.v || {}; m.v[t.dataset.cv] = t.value; persist() }
+  else if (t.dataset.clubowner) { const m = S.members[t.dataset.clubowner]; if (m && t.value && m.owner !== t.value) { m.owner = t.value; notify(t.value, `${me().name} มอบหมายให้คุณเป็นครูผู้สอนชุมนุม "${t.dataset.clubowner}"`, 'acts'); render() } }
 })
 // ลูกศร/Enter เลื่อนช่องกรอก (ซ้าย-ขวา-ขึ้น-ลง) ใช้ได้ทั้งในตารางและแถวช่องกรอก (ตั้งค่าคะแนน ฯลฯ)
 const NAVSEL = 'input:not([type=checkbox]):not([type=file]):not([type=date]):not([type=hidden]):not([type=radio]),select[data-ev],select[data-evrow]'

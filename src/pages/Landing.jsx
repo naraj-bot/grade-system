@@ -75,14 +75,17 @@ export default function Landing() {
         <div className="ld-hero">
           <span className="ld-badge">สำหรับนักเรียนและผู้ปกครอง</span>
           <h1>ระบบผลการเรียน</h1>
-          <p><span className="ph">ติดตามผลการเรียนได้ทุกที่ ทุกเวลา</span><span className="ph">ดูเกรด GPA</span><span className="ph">และดาวน์โหลดใบแจ้งผลการเรียน</span><span className="ph">ได้ทันทีเมื่อโรงเรียนประกาศผล</span></p>
-          <div><button type="button" className="ld-cta" onClick={openStudent}>นักเรียนดูผลการเรียน</button></div>
+          <p><span className="nw">ติดตามผลการเรียนได้ทุกที่ ทุกเวลา</span><span className="nw">ดูเกรด GPA</span><span className="nw">และดาวน์โหลดใบแจ้งผลการเรียน</span><span className="nw">ได้ทันทีเมื่อโรงเรียนประกาศผล</span></p>
+          <div className="ld-ctas"><button type="button" className="ld-cta" onClick={openStudent}>นักเรียนดูผลการเรียน</button><span className="ld-hint">ใช้เลขประจำตัวนักเรียน ไม่ต้องสมัครสมาชิก</span></div>
+          <div className="ld-steps" aria-label="ขั้นตอนดูผลการเรียน">
+            <div><b>1</b>กรอกเลขประจำตัว</div><div><b>2</b>ดูเกรดและ GPA</div><div><b>3</b>ดาวน์โหลดใบแจ้งผล</div>
+          </div>
         </div>
         <div className="ld-card">
-          {pub && (
+          {(
             <div className="ld-status">
-              <span className="small">สถานะประกาศผล · ภาคเรียนที่ {pub.term}/{pub.year}</span>
-              {pub.rows.map((r) => (
+              <span className="small">{pub ? `สถานะประกาศผล · ภาคเรียนที่ ${pub.term}/${pub.year}` : 'สถานะประกาศผล'}</span>
+              {(pub ? pub.rows : [{ label: 'ม.1 – ม.3', done: 0, all: 3 }, { label: 'ป.1 – ป.6', done: 0, all: 6 }]).map((r) => (
                 <div key={r.label}><b>{r.label}</b>
                   <span className={`pill ${r.done === r.all ? 'p-good' : r.done ? 'p-gold' : 'p-bad'}`}>{r.done === r.all ? '✓ ประกาศผลแล้ว' : r.done ? `ประกาศแล้ว ${r.done} ชั้น` : 'รอประกาศ'}</span>
                 </div>
@@ -90,11 +93,13 @@ export default function Landing() {
             </div>
           )}
           <b className="ld-h">ประกาศล่าสุด</b>
-          {news === null ? <div className="small muted">กำลังโหลด…</div> : !news.length ? <div className="small muted">ยังไม่มีประกาศ</div> : news.map((n) => (
+          {news === null ? <div className="small muted">กำลังโหลด…</div> : !news.length ? (
+            <div className="ld-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg><span>ยังไม่มีประกาศจากโรงเรียน เมื่อมีประกาศใหม่จะแสดงที่นี่</span></div>
+          ) : news.map((n) => (
             <div className="ld-news" key={n.id}>
               <div className="ld-date"><b>{day(n.at)}</b><span>{mon(n.at)}</span></div>
               <div>
-                <div className="ld-title">{n.title}</div>
+                <div className="ld-title">{String(n.title).replace(/ – /g, '\u00a0–\u00a0')}</div>
                 <div className="ld-by">{n.tag && <span className={`ld-tag ${TAG[n.tag] || ''}`}>{n.tag}</span>}<span>{n.by}</span></div>
               </div>
             </div>

@@ -358,7 +358,7 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 @media (max-width:640px){.rpsb{grid-template-columns:1fr}}
 
 /* ===== หน้าแรก (ยังไม่ล็อกอิน) จบในหน้าเดียว ===== */
-.ph{display:inline-block;white-space:nowrap;margin-right:.3em}
+.nw{display:inline-block;white-space:nowrap;margin-right:.3em}
 .ld{position:relative;min-height:100vh;min-height:100dvh;box-sizing:border-box;background:#4a0f0f;color:#fbeee9;display:flex;flex-direction:column;overflow:hidden;font-family:var(--f-body)}
 .ld-wm{position:absolute;right:-90px;bottom:-110px;width:520px;height:520px;opacity:.06;pointer-events:none}
 .ld-top{position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px;padding:16px clamp(16px,4vw,40px);border-bottom:1px solid rgba(255,255,255,.12)}
@@ -384,7 +384,7 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .ld-news{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid #f0e0d6}
 .ld-date{flex:none;width:46px;text-align:center;display:flex;flex-direction:column}
 .ld-date b{font:700 24px/1 var(--f-display);color:#8c1c1c}.ld-date span{font-size:12px;color:var(--muted);white-space:nowrap}
-.ld-title{font-weight:700;font-size:16px;line-height:1.45}
+.ld-title{font-weight:700;font-size:16px;line-height:1.45;text-wrap:pretty}
 .ld-by{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted);margin-top:4px}
 .ld-tag{font-weight:700;padding:1px 9px;border-radius:999px;background:var(--gold-soft);color:var(--gold-ink)}
 .ld-tag.t-new{background:var(--good-soft);color:var(--good)}.ld-tag.t-imp{background:var(--bad-soft);color:var(--bad)}.ld-tag.t-urg{background:var(--warn-soft);color:var(--warn)}
@@ -416,7 +416,7 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .sp-key:active{background:#ead6cc;transform:scale(.96)}
 .sp-go{min-height:58px;border-radius:18px;border:0;background:#8c1c1c;color:#fff;font:600 20px var(--f-display);cursor:pointer}
 .sp-go:disabled{background:#c9a29a;cursor:default}.sp-go.wide{width:100%}
-.sp-pad.compact .sp-disp-wrap{padding:6px 0 4px}.sp-pad.compact .sp-keys{box-shadow:none;padding:6px 0 0;border-radius:0}.sp-pad.compact .sp-key{height:56px;font-size:24px}
+.sp-pad.compact .sp-disp-wrap{padding:6px 0 4px}.sp-pad.compact .sp-keys{box-shadow:none;padding:6px 0 0;border-radius:0;background:transparent;margin:0}.sp-pad.compact .sp-key.ghost{background:transparent}.sp-pad.compact .sp-key{height:56px;font-size:24px}
 .sp-res .sp-scroll{padding:16px 16px 28px;display:flex;flex-direction:column;gap:14px}
 .sp-rtop{display:flex;align-items:center;gap:10px}
 .sp-rtop img{width:48px;height:48px}.sp-rtop>div{flex:1;min-width:0}
@@ -442,3 +442,17 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .sp-list.kv>div{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #f3e8e2;font-size:15px}.sp-list.kv>div:last-child{border-bottom:0}.sp-list.kv b{color:#1f6b44;white-space:nowrap}
 .sp-foot{margin:0;text-align:center;font-size:13px;color:var(--muted);line-height:1.6}
 @media (min-width:700px){.sp-login{justify-content:center}.sp-keys{border-radius:28px;margin:0 16px 24px}}
+
+/* หน้าแรก: ปรับสมดุล */
+.ld-hero p{font-size:clamp(16px,1.6vw,19px)}
+.ld-ctas{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}
+.ld-hint{font-size:14px;color:#e6c9c0}
+.ld-steps{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.ld-steps>div{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);font-size:14px;color:#f1dcd5}
+.ld-steps b{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(243,210,122,.18);color:#f3d27a;font:700 14px var(--f-display)}
+.ld-empty{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;background:#faf5f2;color:var(--muted);font-size:14px}
+.ld-empty svg{flex:none;color:#c9a29a}
+.chip.mem.taken{border-style:dashed;opacity:.75}.chip.mem small{font-size:.75em;color:var(--warn)}
+
+.sigln{display:inline-block;position:relative;width:150px;height:1em;margin-top:30px;border-bottom:1px dotted #555;vertical-align:baseline}.sigln .sigimg{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);height:38px;max-width:150px;object-fit:contain;mix-blend-mode:multiply}
+.sigimg{mix-blend-mode:multiply}

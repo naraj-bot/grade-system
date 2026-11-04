@@ -42,7 +42,7 @@ export function StudentKeypad({ onDone, compact }) {
         <span id="sp-lbl" className="sp-lbl">กรอกเลขประจำตัวนักเรียน</span>
         <div className={`sp-disp${v ? ' on' : ''}${err ? ' bad' : ''}`} role="textbox" aria-readonly="true" aria-labelledby="sp-lbl">{v || '·····'}</div>
         {err ? <span className="sp-err" role="alert">{err}</span>
-          : <span className="sp-hint"><span className="ph">ไม่ทราบเลขประจำตัว</span><span className="ph">ดูได้ที่บัตรนักเรียน</span><span className="ph">หรือสอบถามครูประจำชั้น</span></span>}
+          : <span className="sp-hint"><span className="nw">ไม่ทราบเลขประจำตัว</span><span className="nw">ดูได้ที่บัตรนักเรียน</span><span className="nw">หรือสอบถามครูประจำชั้น</span></span>}
       </div>
       <div className="sp-keys">
         <div className="sp-grid">
@@ -111,7 +111,7 @@ function ResultView({ stu, onLogout, onTerm, busy }) {
                 <div className={`sp-g ${gradeTone(g)}`} aria-label={`ผลการเรียน ${g ?? '-'}`}>{g ?? '-'}</div>
                 <div className="sp-info">
                   <div className="sp-meta"><span>{x.code} · {x.type}</span><span>{cr1(x.cr)} {r.crW}</span></div>
-                  <b className="sp-name">{x.name.split(/ (?![0-9])/).map((t, i) => <span key={i} className="ph">{t}</span>)}</b>
+                  <b className="sp-name">{x.name.split(/ (?![0-9])/).map((t, i) => <span key={i} className="nw">{t}</span>)}</b>
                   {(r.showScore || (x.after !== '' && x.after != null)) && (
                     <span className="sp-sub">{r.showScore && x.score != null ? `คะแนน ${x.score} / ${r.full}` : ''}{x.after !== '' && x.after != null ? `${r.showScore && x.score != null ? ' · ' : ''}ผลเดิม ${x.grade ?? '-'} แก้ตัวเป็น ${x.after}` : ''}</span>
                   )}
