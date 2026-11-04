@@ -164,7 +164,10 @@ P.progress=()=>{
   const rows=all.filter(r=>LV==='all'||r.c.level===LV);
   if(!all.length)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
   const cnt=k=>rows.filter(r=>r.p.st===k).length;
-  const list=rows.filter(r=>F==='all'||r.p.st===F);
+  const listAll=rows.filter(r=>F==='all'||r.p.st===F),PGN=25,npg=Math.max(1,Math.ceil(listAll.length/PGN));
+  if(!(S.pgPage>=0&&S.pgPage<npg))S.pgPage=0;
+  const list=listAll.slice(S.pgPage*PGN,S.pgPage*PGN+PGN);
+  const pager=npg>1?`<div class="row pgbar"><button class="btn sm alt" data-pgpage="${S.pgPage-1}" ${S.pgPage<=0?'disabled':''} aria-label="หน้าก่อน">◀</button>${Array.from({length:npg},(_,i)=>`<button class="chip" aria-pressed="${i===S.pgPage}" data-pgpage="${i}">${i+1}</button>`).join('')}<button class="btn sm alt" data-pgpage="${S.pgPage+1}" ${S.pgPage>=npg-1?'disabled':''} aria-label="หน้าถัดไป">▶</button><span class="small muted">วิชาที่ ${S.pgPage*PGN+1}–${S.pgPage*PGN+list.length} จาก ${listAll.length}</span></div>`:'';
   const chip=(k,t)=>`<button class="chip" aria-pressed="${F===k}" data-pgf="${k}">${t}</button>`;
   const bar=r=>`<div style="background:#eee;border-radius:99px;height:8px;min-width:70px;overflow:hidden"><div style="width:${r.p.n?Math.round(r.p.full/r.p.n*100):0}%;height:8px;background:${r.p.st==='sent'?'#2e7d32':'#c4883a'}"></div></div>`;
   const tr=list.map(r=>{const p=r.p;return `<tr><td><b>${r.code}</b><div class="small muted">${esc(r.c.name)}</div></td><td>${r.c.level}</td>${isAdmin()?`<td>${esc(r.teacher)}${r.unreg?'<div><span class="pill p-warn" title="วิชานี้มีการกรอกคะแนนแล้ว แต่ยังไม่มีใบลงทะเบียนสอนที่อนุมัติ ให้ครูผู้สอนลงทะเบียนวิชานี้ในเมนูลงทะเบียนวิชาสอน">ยังไม่ลงทะเบียนสอน</span></div>':''}</td>`:''}<td class="num">${p.n}</td>
@@ -178,8 +181,10 @@ P.progress=()=>{
   // มุมมองรายครู: ครูแต่ละคน วิชาที่ลงทะเบียน และส่งผลแล้วหรือยัง
   const byT={};rows.filter(r=>!r.nt).forEach(r=>{(byT[r.teacher]||(byT[r.teacher]=[])).push(r);});
   const tcards=Object.entries(byT).sort((a,b)=>{const da=a[1].every(r=>r.p.st==='sent'),db=b[1].every(r=>r.p.st==='sent');return (da-db)||a[0].localeCompare(b[0],'th');}).map(([t,rs])=>{const done=rs.filter(r=>r.p.st==='sent').length,ok=done===rs.length;
-   return `<div class="tcard${ok?' ok':''}"><div class="row" style="justify-content:space-between"><b>${ok?'✅':'⏳'} ${esc(t)}</b><span class="pill ${ok?'p-good':'p-warn'}">ส่งแล้ว ${done}/${rs.length} วิชา</span></div>
-   <div class="tsub">${rs.sort((a,b)=>a.c.level.localeCompare(b.c.level,'th')||a.code.localeCompare(b.code)).map(r=>`<span class="tchip ${r.p.st==='sent'?'on':''}" title="${esc(PST[r.p.st][0])}">${r.p.st==='sent'?'✓':'•'} ${r.c.level} ${r.code} ${esc(r.c.name)}</span>`).join('')}</div></div>`;}).join('');
+   const srt=rs.slice().sort((a,b)=>(a.p.st==='sent')-(b.p.st==='sent')||a.c.level.localeCompare(b.c.level,'th')||a.code.localeCompare(b.code));
+   const item=r=>r.p.st==='sent'?`<li class="ok">✓ ${r.c.level} ${r.code} ${esc(r.c.name)}</li>`:`<li class="wait">${r.c.level} ${r.code} ${esc(r.c.name)} <em>${esc(PST[r.p.st][0])}</em></li>`;
+   return ok?`<details class="tcard ok"><summary><b>${esc(t)}</b><span class="tst ok">✓ ส่งครบ ${rs.length} วิชา</span></summary><ul class="tlist">${srt.map(item).join('')}</ul></details>`
+    :`<div class="tcard"><div class="thd"><b>${esc(t)}</b><span class="tst">ส่งแล้ว ${done}/${rs.length}</span></div><ul class="tlist">${srt.map(item).join('')}</ul></div>`;}).join('');
   const nt=rows.filter(r=>r.nt);
   if(V==='teacher')return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>${viewBar}${lvBar}
    <div class="card stack"><h3>ครูส่งผลครบหรือยัง · ภาคเรียนที่ ${T}${LV==='all'?'':' · '+LV}</h3><div class="small muted">✓ = ส่งผลแล้ว · • = ยังไม่ส่ง · ครูที่ยังส่งไม่ครบแสดงก่อน</div><div class="tgrid">${tcards||'<div class="empty">ไม่มีข้อมูล</div>'}</div>
@@ -189,12 +194,13 @@ P.progress=()=>{
   <div class="card stack"><h3>${isAdmin()?'ความคืบหน้าการบันทึกผลทุกวิชา':'วิชาของฉัน: บันทึกแล้วหรือยัง'} · ภาคเรียนที่ ${T}</h3>
   <div class="small muted">ส่งผลได้เมื่อกรอกคะแนนครบทุกคน ${T===1?'· ประถมภาคเรียนที่ 1 ยังไม่ตัดเกรด แต่ส่งผลคะแนนได้':''}</div>
   <div class="row">${chip('all','ทั้งหมด '+rows.length)}${chip('sent','ส่งแล้ว '+cnt('sent'))}${chip('full','รอส่ง '+cnt('full'))}${chip('part','กำลังกรอก '+cnt('part'))}${chip('none','ยังไม่เริ่ม '+cnt('none'))}${isAdmin()&&cnt('noteacher')?chip('noteacher','ไม่มีครู '+cnt('noteacher')):''}</div>
-  <div class="tw"><table><thead><tr><th>วิชา</th><th>ชั้น</th>${isAdmin()?'<th>ครูผู้สอน</th>':''}<th>นักเรียน</th><th>กรอกคะแนนครบ</th><th>เวลาเรียน</th><th>ประเมิน</th><th>สถานะ</th><th></th></tr></thead><tbody>${tr||'<tr><td colspan="9" class="muted">ไม่มีรายการในกลุ่มนี้</td></tr>'}</tbody></table></div></div></div>`;
+  ${pager}<div class="tw pgtbl"><table><thead><tr><th>วิชา</th><th>ชั้น</th>${isAdmin()?'<th>ครูผู้สอน</th>':''}<th>นักเรียน</th><th>กรอกคะแนนครบ</th><th>เวลาเรียน</th><th>ประเมิน</th><th>สถานะ</th><th></th></tr></thead><tbody>${tr||'<tr><td colspan="9" class="muted">ไม่มีรายการในกลุ่มนี้</td></tr>'}</tbody></table></div>${pager}</div></div>`;
 };
 reg('click',e=>{const nx=e.target.closest('[data-nx]');if(nx&&$('#view')&&$('#view').contains(nx)){const [pg,k]=nx.dataset.nx.split('|');if(pg==='eval'&&k)S.evKind=k;if(S.page===pg)render();else CTX.go(pg);if(k==='sub')setTimeout(()=>{const b=document.querySelector('[data-act=dosub],[data-act=unsub]');if(b&&b.scrollIntoView)b.scrollIntoView({block:'center'});},120);return;}
- const t=e.target.closest('[data-pgf],[data-pglv],[data-pgview],[data-act=dosub],[data-act=unsub]');if(!t||!$('#view')||!$('#view').contains(t))return;
-  if(t.dataset.pgf){S.pgF=t.dataset.pgf;render();return;}
-  if(t.dataset.pglv){S.pgLv=t.dataset.pglv;render();return;}
+ const t=e.target.closest('[data-pgf],[data-pglv],[data-pgview],[data-pgpage],[data-act=dosub],[data-act=unsub]');if(!t||!$('#view')||!$('#view').contains(t))return;
+  if(t.dataset.pgf){S.pgF=t.dataset.pgf;S.pgPage=0;render();return;}
+  if(t.dataset.pgpage!==undefined){S.pgPage=+t.dataset.pgpage;render();const tb=$('#view .pgtbl');if(tb&&tb.scrollIntoView)tb.scrollIntoView({block:'start',behavior:'smooth'});return;}
+  if(t.dataset.pglv){S.pgLv=t.dataset.pglv;S.pgPage=0;render();return;}
   if(t.dataset.pgview){S.pgView=t.dataset.pgview;render();return;}
   if(t.dataset.act==='dosub')submitSubject(t.dataset.c||S.scCode);else unsubmitSubject(t.dataset.c||S.scCode);});
 

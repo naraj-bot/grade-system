@@ -546,15 +546,28 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .nav .nd button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 /* ส่วนหัวและส่วนท้ายคงที่ ไม่เลื่อนตามเนื้อหา */
 .main>.top{position:sticky;top:8px;z-index:30}
-.main>.top::before{content:"";position:absolute;left:-16px;right:-16px;top:-8px;height:8px;background:var(--bg)}
+/* แผ่นพื้นหลังรองหัวหน้า: ปิดเนื้อหาที่เลื่อนผ่านทั้งด้านบน มุมโค้ง และใต้แถบหัว */
+.main>.top::before{content:"";position:absolute;left:-16px;right:-16px;top:-8px;bottom:-14px;background:var(--body-bg,var(--bg));background-attachment:fixed;z-index:-1;-webkit-mask-image:linear-gradient(#000 calc(100% - 14px),transparent);mask-image:linear-gradient(#000 calc(100% - 14px),transparent)}
 @media (min-width:821px){.main>.credit{position:sticky;bottom:0;z-index:30}}
 /* ความคืบหน้ารายครู */
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-.tcard{border:1px solid var(--line);border-left:4px solid #c4883a;border-radius:14px;padding:12px 14px;display:grid;gap:8px;background:var(--surface,#fff)}
-.tcard.ok{border-left-color:#2e7d32}
-.tsub{display:flex;flex-wrap:wrap;gap:6px}
-.tchip{font-size:.82rem;padding:3px 9px;border-radius:999px;background:var(--warn-soft,#fdebd3);color:var(--warn,#8a4206)}
-.tchip.on{background:var(--good-soft,#dff3e8);color:var(--good,#1f6b44)}
+/* การ์ดรายครู: กะทัดรัด เน้นเฉพาะวิชาที่ยังไม่ส่ง */
+.tgrid{align-items:start}
+.tcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px;background:var(--surface,#fff)}
+.tcard .thd,.tcard summary{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tcard summary{cursor:pointer;list-style:none}.tcard summary::-webkit-details-marker{display:none}
+.tcard summary::after{content:"▾";color:var(--muted);font-size:.8rem;margin-left:4px}.tcard[open] summary::after{content:"▴"}
+.tcard b{font-size:.95rem}
+.tst{font-size:.8rem;font-weight:700;color:var(--warn,#8a4206);white-space:nowrap}
+.tst.ok{color:var(--good,#1f6b44)}
+.tcard.ok{background:transparent}
+.tlist{margin:0;padding:0;list-style:none;display:grid;gap:2px;font-size:.84rem}
+.tlist li.ok{color:var(--muted)}
+.tlist li.wait{color:var(--fg)}.tlist li.wait::before{content:"•";color:#c4883a;margin-right:6px;font-weight:700}
+.tlist em{font-style:normal;font-size:.76rem;color:var(--warn,#8a4206);margin-left:4px}
 .pgbar .chip{min-width:38px;justify-content:center}
 .chip.has:not([aria-pressed=true]){border-color:var(--gold,#e0bb4a);background:var(--gold-soft,#f5e9bf)}
 .xbtn{all:unset;cursor:pointer;width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;line-height:1}.xbtn:hover{background:rgba(0,0,0,.1)}
+/* เลื่อนหน้าให้ลื่น: แยกเลเยอร์ของส่วนที่ค้างอยู่ */
+.main>.top,.main>.credit{will-change:transform;transform:translateZ(0)}
+.main>.top{box-shadow:0 4px 12px rgba(122,22,22,.18)}
