@@ -354,9 +354,9 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .rps .rhd img{width:80px;height:80px}
 .rpsn{display:flex;justify-content:center;gap:24px;flex-wrap:wrap}.rpsn b{margin-right:6px}
 .rs3{min-width:640px}.rs3 td.b{font-weight:700}.rs3 td.nt{font-size:.8rem;color:#555}
-.rpsb{display:grid;grid-template-columns:minmax(0,58%) 1fr;gap:16px;align-items:start}
+.rpsb{display:grid;grid-template-columns:minmax(0,54%) 1fr;gap:16px;align-items:start}
 .rsum{min-width:0}.rpss{display:grid;gap:10px}
-.rpsb.two{grid-template-columns:minmax(0,50%) 1fr}.rpss.two{grid-template-columns:1fr 1fr;gap:8px}.rpss.two .sg{font-size:.82rem}
+.rpsl{min-width:0}.rpsnote{margin-top:8px;text-align:left}.rpss.two{gap:2px}.rpss.two .sg{font-size:.85rem;margin-top:4px}
 @media (max-width:640px){.rpsb,.rpsb.two{grid-template-columns:1fr}}
 
 /* ===== หน้าแรก (ยังไม่ล็อกอิน) จบในหน้าเดียว ===== */

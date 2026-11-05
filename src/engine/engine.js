@@ -670,9 +670,9 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  const nC=(showSc?10:9)-(showCr?0:1);
  const line=x=>`<tr><td class="num">${x.c.code}</td><td>${esc(x.c.name)}</td><td class="num">${x.add?'เพิ่มเติม':'พื้นฐาน'}</td>${showCr?`<td class="num">${fmtCr(x.cr)}</td>`:''}${showSc?`<td class="num${p1?' b':''}">${x.score==null?'-':Math.round(x.score+1e-9)}</td>`:''}<td class="num b">${x.g==null?'-':x.g}</td><td class="num b">${esc(x.after)}</td><td class="num">${x.ea==null?'-':x.ea}</td><td class="num">${x.er==null?'-':x.er}</td><td class="nt"></td></tr>`;
  const aLine=a=>`<tr><td></td><td>${esc(a.n)}</td><td class="num">กิจกรรม</td>${showCr?'<td></td>':''}${showSc?'<td class="num">-</td>':''}<td class="num b">${p1?'-':a.v}</td><td></td><td></td><td></td><td></td></tr>`;
- const n=rows.length+acts.length,fs=n<=16?13.5:n<=18?12.5:n<=20?12:n<=22?11.5:n<=25?10.5:n<=28?9.5:n<=32?8.5:7.5;
+ const n0=rows.length+acts.length,n=n0+(rpSigners(hr,st).length>1?3:0),fs=n<=16?13.5:n<=18?12.5:n<=20?12:n<=22?11.5:n<=25?10.5:n<=28?9.5:n<=32?8.5:7.5;
  const signers=rpSigners(hr,st),two=signers.length>1,sigD=st.dir?sc.officers.dir.sig:null;
- const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'..............................................'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
+ const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'<span class="sigln"></span>'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
  const lvTxt=(pri?'ประถมศึกษาปีที่ ':'มัธยมศึกษาปีที่ ')+L.replace(/^[ปม]\./,'');
  const tTxt=M==='p2'?'ภาคเรียนที่ 2 (ผลการเรียนทั้งปี)':'ภาคเรียนที่ '+T;
  const note=p1?'ภาคเรียนที่ 1 ของประถมแจ้งคะแนน (เต็มวิชาละ 50) ยังไม่ตัดสินระดับผลการเรียน ผลทั้งปีแจ้งเมื่อสิ้นภาคเรียนที่ 2 · ':M==='p2'?'คะแนนรวมทั้งปี = ภาคเรียนที่ 1 (50) + ภาคเรียนที่ 2 (50) · ':'';
@@ -683,7 +683,7 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  <thead><tr><th rowspan="2">รหัสวิชา</th><th rowspan="2">รายวิชา</th><th rowspan="2">ประเภท</th>${showCr?`<th rowspan="2">${crW}</th>`:''}<th colspan="${showSc?3:2}">การประเมินผลสัมฤทธิ์</th><th rowspan="2">คุณ<br>ลักษณะ</th><th rowspan="2">อ่าน คิด<br>วิเคราะห์ เขียน</th><th rowspan="2">หมายเหตุ</th></tr>
  <tr>${showSc?`<th>คะแนน<br>(${full})</th>`:''}<th>สอบปกติ</th><th>แก้ตัว</th></tr></thead>
  <tbody>${base.map(line).join('')}${add.map(line).join('')}${acts.map(aLine).join('')}${rows.length?'':`<tr><td colspan="${nC}" class="num">ยังไม่มีรายวิชา</td></tr>`}</tbody></table></div>
- <div class="rpsb${two?' two':''}"><div class="tw"><table class="rs3 rsum">${showCr?`<thead><tr><th rowspan="2">สรุปผลการประเมิน</th><th colspan="2">ผลการเรียน</th></tr><tr><th>ที่เรียน</th><th>ที่ได้</th></tr></thead><tbody>
+ <div class="rpsb${two?' two':''}"><div class="rpsl"><div class="tw"><table class="rs3 rsum">${showCr?`<thead><tr><th rowspan="2">สรุปผลการประเมิน</th><th colspan="2">ผลการเรียน</th></tr><tr><th>ที่เรียน</th><th>ที่ได้</th></tr></thead><tbody>
  <tr><td>จำนวน${crW}รายวิชาพื้นฐาน</td><td class="num">${fmtCr(crS(base))}</td><td class="num">${crG(base)}</td></tr>
  <tr><td>จำนวน${crW}รายวิชาเพิ่มเติม</td><td class="num">${fmtCr(crS(add))}</td><td class="num">${crG(add)}</td></tr>
  <tr><td>รวมจำนวน${crW}</td><td class="num">${fmtCr(crS(rows))}</td><td class="num">${crG(rows)}</td></tr>`:`<thead><tr><th colspan="3">สรุปผลการประเมิน</th></tr></thead><tbody>
@@ -692,8 +692,9 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  <tr><td>ผลการประเมินคุณลักษณะอันพึงประสงค์</td><td class="num" colspan="2">${evA}</td></tr>
  <tr><td>ผลการประเมินการอ่าน คิดวิเคราะห์ และเขียน</td><td class="num" colspan="2">${evR}</td></tr>
  <tr><td>ผลการประเมินกิจกรรมพัฒนาผู้เรียน</td><td class="num" colspan="2">${actAll}</td></tr></tbody></table></div>
+ <div class="small rpsnote">${note}คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน${showCr?` · ${crW} 1.0 = 40 ชั่วโมง${pri?'ต่อปี':'ต่อภาคเรียน'}`:''}</div></div>
  <div class="rpss${two?' two':''}">${(signers.length?signers:[null]).map(u=>sg(st.t&&u?S.sigs[u]:null,u?USERS[u].name:'','ครูที่ปรึกษา')).join('')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
- <div class="small">${note}คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน${showCr?` · ${crW} 1.0 = 40 ชั่วโมง${pri?'ต่อปี':'ต่อภาคเรียน'}`:''}</div></div>`;}
+ </div>`;}
 
 P.report=()=>{const RL=sumLevels();if(!RL.length)return '<div class="card empty">ใบแจ้งผลการเรียนพิมพ์ได้เฉพาะครูที่ปรึกษาประจำชั้น (แอดมินกำหนดครูที่ปรึกษาที่หน้า "ตั้งค่าโรงเรียน")</div>';
  const L=RL.includes(S.rpLevel)?S.rpLevel:RL[0];S.rpLevel=L;const _L=L,D=rptData(L),T=D.T,s=D.stus.find(x=>x.id===S.rpStu)||D.stus[0],st=S.rpt[L]||(S.rpt[L]={});
