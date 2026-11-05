@@ -356,7 +356,7 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .rs3{min-width:640px}.rs3 td.b{font-weight:700}.rs3 td.nt{font-size:.8rem;color:#555}
 .rpsb{display:grid;grid-template-columns:minmax(0,54%) 1fr;gap:16px;align-items:start}
 .rsum{min-width:0}.rpss{display:grid;gap:10px}
-.rpsl{min-width:0}.rpsnote{margin-top:8px;text-align:left}.rpss .sigln{width:180px;margin-top:52px}.rpss .sigln .sigimg{width:180px;height:70px;max-width:180px;object-fit:contain;object-position:center bottom}.rpss.two .sigln{margin-top:48px}.rpss.two .sigln .sigimg{height:66px}.rpss.two{gap:2px}.rpss.two .sg{font-size:.85rem;margin-top:4px}
+.rpsl{min-width:0}.rpsnote{margin-top:8px;text-align:left}.rpss .sigln{width:170px;margin-top:48px}.rpss .sigln .sigimg{width:140px;height:52px;max-width:140px;object-fit:contain;object-position:center bottom}.rpss.two .sigln{margin-top:42px}.rpss.two{gap:2px}.rpss.two .sg{font-size:.85rem;margin-top:4px}
 @media (max-width:640px){.rpsb,.rpsb.two{grid-template-columns:1fr}}
 
 /* ===== หน้าแรก (ยังไม่ล็อกอิน) จบในหน้าเดียว ===== */

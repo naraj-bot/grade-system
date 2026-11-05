@@ -351,6 +351,9 @@ function metaOf(code){const m=S.meta[code]||(S.meta[code]={desc:'',img:null,unit
 function groupsOf(cfg){const g=[];cfg.cols.forEach((k,i)=>{const u=(k.u||'').trim(),last=g[g.length-1];if(u&&last&&last.u===u){last.idx.push(i);last.max+=+k.max||0;}else g.push({u,label:u||k.n,idx:[i],max:+k.max||0});});return g;}
 const gsum=(r,g)=>{const v=g.idx.map(i=>r.v.c[i]).filter(x=>x!==''&&x!=null);return v.length?v.reduce((p,q)=>p+(+q),0):null;};
 const sigImg=s=>s?`<span class="sigln"><img class="sigimg" src="${s}" alt="ลายเซ็น"></span>`:'';
+// ลายเซ็นในใบแจ้งผล: ปรับขนาดตามสัดส่วนรูป ให้ "น้ำหนักภาพ" ใกล้เคียงกัน (พื้นที่ ≈ 330 ตร.มม.) · ทรงกว้างไม่ใหญ่เกิน ทรงแคบ/เส้นบางไม่เล็กกว่าคนอื่น
+const pngDim=u=>{try{if(typeof atob!=='function'||!/^data:image\/png;base64,/.test(u))return null;const b=atob(u.slice(22,22+48)),g=i=>((b.charCodeAt(i)<<24)|(b.charCodeAt(i+1)<<16)|(b.charCodeAt(i+2)<<8)|b.charCodeAt(i+3))>>>0;const w=g(16),h=g(20);return w>0&&h>0?[w,h]:null}catch{return null}};
+const sigImgFit=(u,k=1)=>{const d=pngDim(u);if(!d)return sigImg(u);const r=d[0]/d[1];let h=Math.sqrt(330/r),w=r*h;if(h>16){h=16;w=r*h}if(w>38){w=38;h=w/r}h*=k;w*=k;return `<span class="sigln"><img class="sigimg" style="width:${w.toFixed(1)}mm;height:${h.toFixed(1)}mm;max-width:none" src="${u}" alt="ลายเซ็น"></span>`};
 function getSig(t){const [k,id]=t.split(':');return k==='u'?S.sigs[id]:k==='o'?S.school.officers[id].sig:(S.school.heads[id]||{}).sig;}
 function setSig(t,v){if(v)sigMark(t,'saving');else delete S.sigSt[t];const [k,id]=t.split(':');if(k==='u')S.sigs[id]=v;else if(k==='o')S.school.officers[id].sig=v;else(S.school.heads[id]=S.school.heads[id]||{name:''}).sig=v;}
 P.p5=()=>{
@@ -673,8 +676,9 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  const line=x=>`<tr><td class="num">${x.c.code}</td><td>${esc(x.c.name)}</td><td class="num">${x.add?'เพิ่มเติม':'พื้นฐาน'}</td>${showCr?`<td class="num">${fmtCr(x.cr)}</td>`:''}${showSc?`<td class="num${p1?' b':''}">${x.score==null?'-':Math.round(x.score+1e-9)}</td>`:''}<td class="num b">${x.g==null?'-':x.g}</td><td class="num b">${esc(x.after)}</td><td class="num">${x.ea==null?'-':x.ea}</td><td class="num">${x.er==null?'-':x.er}</td><td class="nt"></td></tr>`;
  const aLine=a=>`<tr><td></td><td>${esc(a.n)}</td><td class="num">กิจกรรม</td>${showCr?'<td></td>':''}${showSc?'<td class="num">-</td>':''}<td class="num b">${p1?'-':a.v}</td><td></td><td></td><td></td><td></td></tr>`;
  const n0=rows.length+acts.length,n=n0+(rpSigners(hr,st).length>1?3:2),fs=n<=16?13.5:n<=18?12.5:n<=20?12:n<=22?11.5:n<=25?10.5:n<=28?9.5:n<=32?8.5:7.5;
+ const kk=(n0>=24?0.8:1)*(rpSigners(hr,st).length>1?0.92:1);
  const signers=rpSigners(hr,st),two=signers.length>1,sigD=st.dir?sc.officers.dir.sig:null;
- const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'<span class="sigln"></span>'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
+ const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImgFit(img,kk):'<span class="sigln"></span>'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
  const lvTxt=(pri?'ประถมศึกษาปีที่ ':'มัธยมศึกษาปีที่ ')+L.replace(/^[ปม]\./,'');
  const tTxt=M==='p2'?'ภาคเรียนที่ 2 (ผลการเรียนทั้งปี)':'ภาคเรียนที่ '+T;
  const note=p1?'ภาคเรียนที่ 1 ของประถมแจ้งคะแนน (เต็มวิชาละ 50) ยังไม่ตัดสินระดับผลการเรียน ผลทั้งปีแจ้งเมื่อสิ้นภาคเรียนที่ 2 · ':M==='p2'?'คะแนนรวมทั้งปี = ภาคเรียนที่ 1 (50) + ภาคเรียนที่ 2 (50) · ':'';
