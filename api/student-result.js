@@ -44,7 +44,8 @@ function shape(doc, opts) {
     showScore: !!opts.score || d.mode === 'p1', // ประถมภาคเรียนที่ 1 ยังไม่มีเกรด จึงแสดงคะแนนเสมอ
   }
   if (opts.ev) Object.assign(out, { evA: d.evA, evR: d.evR })
-  if (opts.act) Object.assign(out, { acts: d.acts, actAll: d.actAll })
+  // ใบเกรดไม่ระบุชื่อชุมนุม (ข้อมูลที่เผยแพร่ไว้ก่อนหน้านี้อาจมี “ชุมนุม (ชื่อ)” ตัดออกให้)
+  if (opts.act) Object.assign(out, { acts: (d.acts || []).map((x) => ({ ...x, n: /^ชุมนุม/.test(x.n) ? 'ชุมนุม' : x.n })), actAll: d.actAll })
   if (opts.pdf) out.html = (opts.score || d.mode === 'p1' || !doc.htmlNs ? doc.html : doc.htmlNs) || null
   return out
 }

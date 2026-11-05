@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { useAuth } from '../auth'
+import { recentKeys } from '../lib/notify'
 import { isAdminRole } from '../lib/constants'
 
 const KEEP = 45 * 24 * 3600 * 1000
@@ -21,9 +22,9 @@ export default function Bell() {
 
   useEffect(() => {
     const map = (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }))
-    const u1 = onSnapshot(query(collection(db, 'notifications'), where('to', '==', user.uid)), (s) => setMine(map(s)), () => {})
+    const u1 = onSnapshot(query(collection(db, 'notifications'), where('to', '==', user.uid), where('tk', 'in', recentKeys(user.uid))), (s) => setMine(map(s)), () => {})
     const u2 = isAdminRole(user.role)
-      ? onSnapshot(query(collection(db, 'notifications'), where('to', '==', 'admins')), (s) => setAdm(map(s)), () => {})
+      ? onSnapshot(query(collection(db, 'notifications'), where('to', '==', 'admins'), where('tk', 'in', recentKeys('admins'))), (s) => setAdm(map(s)), () => {})
       : () => {}
     return () => { u1(); u2() }
   }, [user.uid, user.role])

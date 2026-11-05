@@ -44,7 +44,8 @@ const me = () => USERS[S.role]
 const isAdmin = () => me().kind !== 'teacher'
 function note() {}
 function notify(to, text, link) {
-  setDoc(doc(collection(db, 'notifications')), { to, text, link: link || '', from: S.role, ts: Date.now() }).catch(() => {})
+  const d = new Date(), tk = `${to}|${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`
+  setDoc(doc(collection(db, 'notifications')), { to, tk, text, link: link || '', from: S.role, ts: Date.now() }).catch(() => {})
 }
 function toast(t) {
   let e = $('#toast')
@@ -162,7 +163,7 @@ function subCard(c,R){
 P.progress=()=>{
   const all=progRows(),T=S.term,F=S.pgF||'all',LV=S.pgLv||'all',V=isAdmin()?(S.pgView||'subj'):'subj';
   const rows=all.filter(r=>LV==='all'||r.c.level===LV);
-  if(!all.length)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
+  if(!all.length)return `${actMissCard()}<div class="card empty">ยังไม่มีวิชาที่อนุมัติสำหรับภาคเรียนนี้<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
   const cnt=k=>rows.filter(r=>r.p.st===k).length;
   const listAll=rows.filter(r=>F==='all'||r.p.st===F),PGN=25,npg=Math.max(1,Math.ceil(listAll.length/PGN));
   if(!(S.pgPage>=0&&S.pgPage<npg))S.pgPage=0;
@@ -186,10 +187,10 @@ P.progress=()=>{
    return ok?`<details class="tcard ok"><summary><b>${esc(t)}</b><span class="tst ok">✓ ส่งครบ ${rs.length} วิชา</span></summary><ul class="tlist">${srt.map(item).join('')}</ul></details>`
     :`<div class="tcard"><div class="thd"><b>${esc(t)}</b><span class="tst">ส่งแล้ว ${done}/${rs.length}</span></div><ul class="tlist">${srt.map(item).join('')}</ul></div>`;}).join('');
   const nt=rows.filter(r=>r.nt);
-  if(V==='teacher')return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>${viewBar}${lvBar}
+  if(V==='teacher')return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>${viewBar}${lvBar}${actMissCard()}
    <div class="card stack"><h3>ครูส่งผลครบหรือยัง · ภาคเรียนที่ ${T}${LV==='all'?'':' · '+LV}</h3><div class="small muted">✓ = ส่งผลแล้ว · • = ยังไม่ส่ง · ครูที่ยังส่งไม่ครบแสดงก่อน</div><div class="tgrid">${tcards||'<div class="empty">ไม่มีข้อมูล</div>'}</div>
    ${nt.length?`<div class="lock small"><b>วิชาที่ยังไม่มีครูสอน ${nt.length} วิชา:</b> ${nt.map(r=>`${r.c.level} ${r.code} ${esc(r.c.name)}`).join(' · ')}</div>`:''}</div></div>`;
-  return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>${viewBar}${lvBar}
+  return `<div class="stack"><div class="row">${[1,2].map(t=>`<button class="chip" aria-pressed="${T===t}" data-term="${t}">ภาคเรียนที่ ${t}</button>`).join('')}</div>${viewBar}${lvBar}${actMissCard()}
   <div class="grid"><div class="card kpi"><b>${rows.length}</b>วิชาทั้งหมด</div><div class="card kpi"><b style="color:#2e7d32">${cnt('sent')}</b>ส่งผลแล้ว</div><div class="card kpi"><b>${cnt('full')}</b>กรอกครบ รอส่ง</div><div class="card kpi"><b>${cnt('part')+cnt('none')+cnt('noteacher')}</b>ยังไม่เสร็จ</div></div>
   <div class="card stack"><h3>${isAdmin()?'ความคืบหน้าการบันทึกผลทุกวิชา':'วิชาของฉัน: บันทึกแล้วหรือยัง'} · ภาคเรียนที่ ${T}</h3>
   <div class="small muted">ส่งผลได้เมื่อกรอกคะแนนครบทุกคน ${T===1?'· ประถมภาคเรียนที่ 1 ยังไม่ตัดเกรด แต่ส่งผลคะแนนได้':''}</div>
@@ -350,7 +351,7 @@ function groupsOf(cfg){const g=[];cfg.cols.forEach((k,i)=>{const u=(k.u||'').tri
 const gsum=(r,g)=>{const v=g.idx.map(i=>r.v.c[i]).filter(x=>x!==''&&x!=null);return v.length?v.reduce((p,q)=>p+(+q),0):null;};
 const sigImg=s=>s?`<span class="sigln"><img class="sigimg" src="${s}" alt="ลายเซ็น"></span>`:'';
 function getSig(t){const [k,id]=t.split(':');return k==='u'?S.sigs[id]:k==='o'?S.school.officers[id].sig:(S.school.heads[id]||{}).sig;}
-function setSig(t,v){const [k,id]=t.split(':');if(k==='u')S.sigs[id]=v;else if(k==='o')S.school.officers[id].sig=v;else(S.school.heads[id]=S.school.heads[id]||{name:''}).sig=v;}
+function setSig(t,v){if(v)sigMark(t,'saving');else delete S.sigSt[t];const [k,id]=t.split(':');if(k==='u')S.sigs[id]=v;else if(k==='o')S.school.officers[id].sig=v;else(S.school.heads[id]=S.school.heads[id]||{name:''}).sig=v;}
 P.p5=()=>{
  const codes=pickSubject();
  if(!codes)return `<div class="card empty">ยังไม่มีวิชาที่อนุมัติ<br><br><button class="btn" data-go="reg">ไปลงทะเบียนสอน</button></div>`;
@@ -523,7 +524,7 @@ P.p5=()=>{
 const GUIDE={
  super:[['ตั้งปีการศึกษา','เปิดปีการศึกษาและภาคเรียน ปิดปีเมื่อสิ้นปีเพื่อเก็บข้อมูลและเลื่อนชั้น','years'],['สร้างบัญชีผู้ใช้','สร้างแอดมินโรงเรียนและครู กำหนดรหัสเริ่มต้น รีเซ็ตรหัสเมื่อลืม และส่งออกใบรหัส','users'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่จะเปิดสอนในปีและภาคเรียนนี้','catalog'],['เพิ่มนักเรียน','เพิ่มทีละคนหรือวางรายชื่อหลายคน ใส่เลขประจำตัวนักเรียนให้ครบ (นักเรียนใช้เลขนี้ดูผลการเรียน) ระบบเลื่อนชั้นให้เองตอนขึ้นปีใหม่','students'],['อนุมัติการสอน','ตรวจที่ครูลงทะเบียน อนุมัติ หรือส่งกลับพร้อมข้อความ รวมถึงคำขอแก้ไขการลงทะเบียน (ขอเพิ่ม/เอาวิชาออก) · แอดมินที่สอนด้วยให้ลงทะเบียน "วิชาที่ฉันสอน" ไว้ ชื่อจึงจะขึ้นเป็นครูผู้สอน','reg'],['ติดตามความคืบหน้า','เลือกดูทีละชั้นหรือทุกชั้น และสลับเป็นมุมมอง "รายครู" ดูว่าครูแต่ละคนส่งผลครบหรือยัง','progress'],['เผยแพร่ผลให้นักเรียน','เลือกว่านักเรียนเห็นคะแนนหรือเฉพาะเกรด แล้วกดเผยแพร่รายชั้น ถ้าครูแก้คะแนนภายหลังให้กด "เผยแพร่ใหม่"','publish'],['ประกาศหน้าแรก','เพิ่ม แก้ไข ปักหมุด ซ่อน หรือลบประกาศ ตั้ง "วันที่กำหนด" เช่น วันผลการเรียนออก หน้าแรกนับถอยหลังและขึ้นประกาศใหม่ให้เองเมื่อถึงวัน','news'],['ติดตามและส่งออก','ดูเอกสารของแต่ละวิชาและดาวน์โหลดเป็นหลักฐาน','p5']],
  admin:[['ตั้งค่าโรงเรียน','กรอกชื่อและลายเซ็นของ ผอ. หัวหน้างานวัดผล หัวหน้างานวิชาการ และหัวหน้ากลุ่มสาระ และกำหนดครูที่ปรึกษาประจำชั้น','school'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่เปิดสอนในภาคเรียนนี้ ทีละวิชาหรือหลายวิชา','catalog'],['จัดการนักเรียน','เพิ่มนักเรียนใหม่ ย้ายเข้า หรือวางรายชื่อหลายคน ใส่เลขประจำตัวนักเรียนให้ครบ','students'],['อนุมัติการสอน','ตรวจรายการที่ครูลงทะเบียนและคำขอแก้ไข ถ้าไม่ถูกต้องส่งกลับพร้อมข้อความ','reg'],['ติดตามความคืบหน้า','เลือกดูทีละชั้น หรือมุมมอง "รายครู" ว่าครูคนไหนส่งผลครบแล้ว','progress'],['จัดผู้ตัดสินกิจกรรม','เลือกชั้นก่อน แล้วเลือกผู้ตัดสินแนะแนว ลูกเสือ-เนตรนารี และกิจกรรมเพื่อสังคมฯ ในการ์ดของแต่ละกิจกรรม (ไม่เลือก = ครูที่ปรึกษา) · สร้างชุมนุมของชั้นนั้นพร้อมเลือกครูผู้สอน ระบบเตือนเมื่อนักเรียนอยู่หลายชุมนุม','acts'],['ลงนามและอนุมัติเล่ม','ในหน้าสมุด ปพ.5 ติ๊กลงนามของหัวหน้าฝ่ายต่าง ๆ และให้ ผอ. อนุมัติ พร้อมวันที่','p5'],['เผยแพร่ผลและประกาศ','เผยแพร่ผลการเรียนรายชั้นให้นักเรียนดูออนไลน์ และลงประกาศบนหน้าแรก','publish'],['ดาวน์โหลดเอกสาร','ดาวน์โหลด ปพ.5 ของแต่ละวิชาและเอกสารสรุป','p5']],
- teacher:[['ลงทะเบียนวิชาที่สอน','กดเลือกชั้นทีละชั้น แล้วติ๊กวิชาที่สอน (วิชาของชั้นอื่นที่ติ๊กไว้ยังอยู่ ดูได้ในกล่อง "วิชาที่เลือกไว้ทั้งหมด") ส่งให้แอดมินอนุมัติทุกภาคเรียน · อนุมัติแล้วถ้าลงไม่ครบ กด "แก้ไขการลงทะเบียน" ขอเพิ่มได้','reg'],['รอการอนุมัติ','ถ้าแอดมินส่งกลับจะมีแจ้งเตือนและข้อความ ให้แก้แล้วส่งใหม่','reg'],['ตั้งช่องคะแนนเก็บ','ตั้งว่าเก็บกี่ช่อง ช่องละเท่าไร ประถมเลือกเก็บ 100 หรือ 50 ต่อภาคเรียน','scores'],['กรอกคะแนน','กรอกในตาราง หรือกด "ดาวน์โหลดแบบกรอกคะแนน (Excel)" ไปกรอกใน Excel / Google ชีต แล้ว "แนบไฟล์คะแนน" ระบบกรอกให้อัตโนมัติ · ชั่วโมงที่ขาดกรอกเฉพาะคนที่ขาด ผู้ที่เวลาเรียนต่ำกว่า 80% ได้ มส.','scores'],['เช็คชื่อรายวัน (ถ้าใช้)','เพิ่มวันเรียนต่อจากของเดิม หน้าละ 20 วัน กดเลขหน้าเพื่อดูวันก่อนหน้า','att'],['ตัดสินกิจกรรม','ชุมนุมเลือกสมาชิกของตน ส่วนลูกเสือและกิจกรรมเพื่อสังคมเป็นของครูที่ปรึกษา · ประถมตัดสินผลกิจกรรมในภาคเรียนที่ 2','acts'],['ประเมินผู้เรียน','ให้คะแนนคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะ รายข้อ ทีละคนหรือทั้งห้อง ระบบสรุปผลให้ (ประถมกรอกภาคเรียนที่ 2)','eval'],['ส่งผล','กรอกครบทุกคนแล้วกด "ส่งผล" ที่หน้าความคืบหน้า ถ้าต้องแก้ กด "ยกเลิกส่ง"','progress'],['ใบแจ้งผลและสรุปห้อง (ครูที่ปรึกษา)','เห็นเฉพาะห้องที่เป็นครูที่ปรึกษา ดาวน์โหลด PDF ใบแจ้งผลรายบุคคลหรือทั้งห้อง พร้อมลงนาม','report'],['สร้างลายเซ็น','วาดหรือแนบภาพลายเซ็น ระบบลบพื้นหลังให้ ใช้ลงชื่อในเล่ม ปพ.5 และใบแจ้งผล','sign'],['กรอกข้อมูลประกอบเล่ม','คำอธิบายรายวิชา มาตรฐาน/ตัวชี้วัดและเวลาของแต่ละหน่วย แล้วดูรายการตรวจความครบถ้วน','p5'],['ลงนามและดาวน์โหลด ปพ.5','กดลงลายมือชื่อครูผู้สอน ตรวจครบแล้วดาวน์โหลดเป็นหลักฐาน ระบบตั้งชื่อไฟล์ให้','p5']]};
+ teacher:[['ลงทะเบียนวิชาที่สอน','กดเลือกชั้นทีละชั้น แล้วติ๊กวิชาที่สอน (วิชาของชั้นอื่นที่ติ๊กไว้ยังอยู่ ดูได้ในกล่อง "วิชาที่เลือกไว้ทั้งหมด") ส่งให้แอดมินอนุมัติทุกภาคเรียน · อนุมัติแล้วถ้าลงไม่ครบ กด "แก้ไขการลงทะเบียน" ขอเพิ่มได้','reg'],['รอการอนุมัติ','ถ้าแอดมินส่งกลับจะมีแจ้งเตือนและข้อความ ให้แก้แล้วส่งใหม่','reg'],['ตั้งช่องคะแนนเก็บ','ตั้งว่าเก็บกี่ช่อง ช่องละเท่าไร ประถมเลือกเก็บ 100 หรือ 50 ต่อภาคเรียน','scores'],['กรอกคะแนน','กรอกในตาราง หรือกด "ดาวน์โหลดแบบกรอกคะแนน (Excel)" ไปกรอกใน Excel / Google ชีต แล้ว "แนบไฟล์คะแนน" ระบบกรอกให้อัตโนมัติ · ชั่วโมงที่ขาดกรอกเฉพาะคนที่ขาด ผู้ที่เวลาเรียนต่ำกว่า 80% ได้ มส.','scores'],['เช็คชื่อรายวัน (ถ้าใช้)','เพิ่มวันเรียนต่อจากของเดิม หน้าละ 20 วัน กดเลขหน้าเพื่อดูวันก่อนหน้า','att'],['ตัดสินกิจกรรม','ชุมนุมเลือกสมาชิกของตน ส่วนลูกเสือและกิจกรรมเพื่อสังคมเป็นของครูที่ปรึกษา · ประถมตัดสินผลกิจกรรมในภาคเรียนที่ 2','acts'],['ประเมินผู้เรียน','ให้คะแนนคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะ รายข้อ ทีละคนหรือทั้งห้อง ระบบสรุปผลให้ (ประถมกรอกภาคเรียนที่ 2)','eval'],['ส่งผล','กรอกครบทุกคนแล้วกด "ส่งผล" ที่หน้าความคืบหน้า ถ้าต้องแก้ กด "ยกเลิกส่ง" · หน้าเดียวกันแจ้งกิจกรรมพัฒนาผู้เรียนที่ยังไม่ได้ตัดสิน (งานของคุณ)','progress'],['ใบแจ้งผลและสรุปห้อง (ครูที่ปรึกษา)','เห็นเฉพาะห้องที่เป็นครูที่ปรึกษา ดาวน์โหลด PDF ใบแจ้งผลรายบุคคลหรือทั้งห้อง พร้อมลงนาม','report'],['สร้างลายเซ็น','วาดหรือแนบภาพลายเซ็น ระบบลบพื้นหลังให้ ใช้ลงชื่อในเล่ม ปพ.5 และใบแจ้งผล','sign'],['กรอกข้อมูลประกอบเล่ม','คำอธิบายรายวิชา มาตรฐาน/ตัวชี้วัดและเวลาของแต่ละหน่วย แล้วดูรายการตรวจความครบถ้วน','p5'],['ลงนามและดาวน์โหลด ปพ.5','กดลงลายมือชื่อครูผู้สอน ตรวจครบแล้วดาวน์โหลดเป็นหลักฐาน ระบบตั้งชื่อไฟล์ให้','p5']]};
 P.guide=()=>{const k=me().kind,NM={super:'แอดมินหลัก',admin:'แอดมินโรงเรียน',teacher:'ครูผู้สอน'}
  const tabs=k==='super'?['super','admin','teacher']:k==='admin'?['admin','teacher']:['teacher']
  const v=tabs.includes(S.guideKind)?S.guideKind:k, own=v===k, st=GUIDE[v]
@@ -542,8 +543,15 @@ P.guide=()=>{const k=me().kind,NM={super:'แอดมินหลัก',admin:
   <li>เกรดคิดจากคะแนนรวมที่ปัดเป็นจำนวนเต็ม (.5 ขึ้นไปปัดขึ้น)</li></ul></div></div>`;};
 
 /* ---------- ลายเซ็นอิเล็กทรอนิกส์ ---------- */
-function sigWidget(target,label){const cur=getSig(target);
- return `<div class="card stack"><b>${label}</b>${cur?`<img class="sigprev" src="${cur}" alt="ลายเซ็นปัจจุบัน">`:'<div class="small muted">ยังไม่มีลายเซ็น</div>'}
+// สถานะการบันทึกลายเซ็น: S.sigSt[target] = {state:'saving'|'ok'|'err', at, msg}
+S.sigSt={};
+const sigMark=(t,state,msg)=>{S.sigSt[t]={state,at:Date.now(),msg:msg||''};};
+function sigWidget(target,label){const cur=getSig(target),st=S.sigSt[target]||{};
+ const hm=t=>new Date(t).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+ const badge=st.state==='saving'?'<span class="sigst wait">⏳ กำลังบันทึกขึ้นระบบ…</span>':st.state==='err'?`<span class="sigst bad">✕ บันทึกไม่สำเร็จ ${esc(st.msg)}</span>`:st.state==='ok'?`<span class="sigst ok">✓ บันทึกขึ้นระบบแล้ว (${hm(st.at)} น.)</span>`:'<span class="sigst ok">✓ มีลายเซ็นในระบบแล้ว</span>';
+ return `<div class="card stack"><b>${label}</b>
+ ${cur?`<div class="sigbox"><div class="row" style="justify-content:space-between"><b class="small">ลายเซ็นปัจจุบัน</b>${badge}</div><img class="sigprev" src="${cur}" alt="ลายเซ็นปัจจุบัน"></div>`:`<div class="sigbox none">${st.state==='err'?`<span class="sigst bad">✕ บันทึกไม่สำเร็จ ${esc(st.msg)}</span>`:'<span class="small muted">ยังไม่มีลายเซ็น · วาดในกรอบด้านล่างแล้วกด “บันทึกลายเซ็นที่วาด” หรือกด “แนบภาพลายเซ็น”</span>'}</div>`}
+ <div class="small muted">${cur?'วาดลายเซ็นใหม่ (ถ้าต้องการเปลี่ยน)':'กรอบวาดลายเซ็น'}</div>
  <canvas class="sigc" data-target="${target}" width="520" height="170" aria-label="กรอบวาดลายเซ็น"></canvas>
  <div class="row"><button class="btn sm" data-act="sigsave" data-target="${target}">บันทึกลายเซ็นที่วาด</button><button class="btn sm alt" data-act="sigclear" data-target="${target}">ล้างกรอบ</button>
  <label class="btn sm alt" style="cursor:pointer">แนบภาพลายเซ็น<input type="file" accept="image/*" data-sigfile="${target}" hidden></label>${cur?`<button class="btn sm alt" data-act="sigclean" data-target="${target}">ลบพื้นหลังลายเซ็นเดิม</button><button class="btn sm alt" data-act="sigdel" data-target="${target}">ลบลายเซ็น</button>`:''}</div>
@@ -559,7 +567,7 @@ function cleanSig(url,cb){const im=new Image();im.onload=()=>{const W=im.width,H
   p[i+3]=Math.round(a*255);if(a>0){const k=i/4,xx=k%W,yy=(k-xx)/W;p[i]=Math.min(p[i],90);p[i+1]=Math.min(p[i+1],90);p[i+2]=Math.min(p[i+2],120);if(a>.2){if(xx<x0)x0=xx;if(xx>x1)x1=xx;if(yy<y0)y0=yy;if(yy>y1)y1=yy;}}}
  x.putImageData(d,0,0);if(x1<0)return cb(url);const pad=6;x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(W-1,x1+pad);y1=Math.min(Hh-1,y1+pad);
  const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;o.getContext('2d').drawImage(cv,x0,y0,o.width,o.height,0,0,o.width,o.height);cb(o.toDataURL('image/png'));};im.onerror=()=>cb(url);im.src=url;}
-function readImg(file,max,type,cb){const fr=new FileReader();fr.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);const x=cv.getContext('2d');if(type==='jpeg'){x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);}x.drawImage(im,0,0,cv.width,cv.height);cb(cv.toDataURL('image/'+type,.88));};im.src=fr.result;};fr.readAsDataURL(file);}
+function readImg(file,max,type,cb,onErr){const fail=onErr||(()=>toast('เปิดไฟล์ภาพนี้ไม่ได้ (รองรับ JPG / PNG)'));const fr=new FileReader();fr.onerror=fail;fr.onload=()=>{const im=new Image();im.onerror=fail;im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);const x=cv.getContext('2d');if(type==='jpeg'){x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);}x.drawImage(im,0,0,cv.width,cv.height);cb(cv.toDataURL('image/'+type,.88));};im.src=fr.result;};fr.readAsDataURL(file);}
 P.sign=()=>`<div class="stack"><div class="card"><b>ลายเซ็นของฉัน (${esc(me().name)})</b><div class="small muted">ใช้ลงชื่อในสมุด ปพ.5 เมื่อกด "ลงลายมือชื่อครูผู้สอน" ในหน้าสมุด ปพ.5 ลายเซ็นเก็บเฉพาะบัญชีของคุณ</div></div>${sigWidget('u:'+S.role,'วาดหรือแนบลายเซ็น')}</div>`;
 P.school=()=>{const sc=S.school,o=sc.officers;
  return `<div class="stack"><div class="card stack"><h3>ข้อมูลโรงเรียน</h3><label for="scn">ชื่อโรงเรียน</label><input id="scn" data-sc2="name" value="${esc(sc.name)}"><label for="sca">สังกัด</label><input id="sca" data-sc2="area" value="${esc(sc.area)}"></div>
@@ -590,7 +598,7 @@ reg('click',e=>{const t=e.target.closest('[data-evk],[data-act]');if(!t)return;c
  if(a==='sigclear'){const cv=document.querySelector(`canvas.sigc[data-target="${d.target}"]`);cv.getContext('2d').clearRect(0,0,cv.width,cv.height);cv._dirty=false;}
  else if(a==='sigsave'){const cv=document.querySelector(`canvas.sigc[data-target="${d.target}"]`);if(!cv._dirty)return toast('วาดลายเซ็นในกรอบก่อน');cleanSig(cv.toDataURL('image/png'),u=>{setSig(d.target,u);toast('บันทึกลายเซ็นแล้ว');render();});}
   else if(a==='sigclean'){const cur=getSig(d.target);if(cur)cleanSig(cur,u=>{setSig(d.target,u);toast('ลบพื้นหลังลายเซ็นแล้ว');render();});}
- else if(a==='sigdel'){setSig(d.target,null);render();}
+ else if(a==='sigdel'){if(d.target==='u:'+S.role)S.sigDelReq=true;setSig(d.target,null);render();}
  else if(a==='descdel'){metaOf(S.scCode).img=null;render();}
  else if(a==='holadd'){const f=$('#hf').value,e2=$('#ht').value;if(!f)return toast('เลือกวันที่หยุดก่อน');if(e2&&e2<f)return toast('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม');calOf().hol.push({f,t:e2||f,n:($('#hn').value||'').trim()});render();}
  else if(a==='holstd'){const cal=calOf(),ys=new Set();[1,2].forEach(t=>[cal[t].open,cal[t].close].forEach(v=>{if(v)ys.add(+v.slice(0,4));}));if(!ys.size){const y=(+S.year||2569)-543;ys.add(y);ys.add(y+1);}const FX=[['01-01','วันขึ้นปีใหม่'],['04-06','วันจักรี'],['04-13','วันสงกรานต์'],['04-14','วันสงกรานต์'],['04-15','วันสงกรานต์'],['05-01','วันแรงงาน'],['05-04','วันฉัตรมงคล'],['06-03','วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี'],['07-28','วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว'],['08-12','วันแม่แห่งชาติ'],['10-13','วันนวมินทรมหาราช'],['10-23','วันปิยมหาราช'],['12-05','วันพ่อแห่งชาติ'],['12-10','วันรัฐธรรมนูญ'],['12-31','วันสิ้นปี']];let n=0;const have=new Set(cal.hol.map(h=>h.f));ys.forEach(y=>FX.forEach(([md,nm])=>{const d=y+'-'+md;if(!have.has(d)){cal.hol.push({f:d,t:d,n:nm});have.add(d);n++;}}));render();toast('เพิ่มวันหยุดแล้ว '+n+' รายการ (ปี '+[...ys].map(y=>y+543).join(', ')+')');}
@@ -601,7 +609,11 @@ reg('click',e=>{const t=e.target.closest('[data-evk],[data-act]');if(!t)return;c
 reg('change',e=>{const t=e.target,d=t.dataset;
  if(t.id==='desc'){metaOf(S.scCode).desc=t.value;}
  else if(t.id==='descimg'&&t.files[0]){readImg(t.files[0],1200,'jpeg',u=>{metaOf(S.scCode).img=u;render();});}
- else if(d.sigfile!==undefined&&t.files[0]){readImg(t.files[0],520,'png',u=>cleanSig(u,v=>{setSig(d.sigfile,v);toast('แนบลายเซ็นแล้ว (ลบพื้นหลังให้แล้ว)');render();}));}
+ else if(d.sigfile!==undefined&&t.files[0]){const f=t.files[0],tg=d.sigfile;t.value='';
+  const bad=()=>tell({title:'แนบภาพลายเซ็นนี้ไม่ได้',text:'รองรับไฟล์ JPG และ PNG'+(/hei[cf]/i.test(f.type+f.name)?'\n\nไฟล์นี้เป็น HEIC (ภาพจาก iPhone) ให้ถ่ายหน้าจอภาพลายเซ็น หรือแชร์/บันทึกเป็น JPG แล้วแนบใหม่':'')+'\n\nหรือวาดลายเซ็นในกรอบด้านบนแทนได้',tone:'warn'});
+  if(f.size>15*1024*1024)return tell({title:'ไฟล์ใหญ่เกินไป',text:'ภาพลายเซ็นต้องไม่เกิน 15 MB ลองครอปให้เหลือเฉพาะลายเซ็น',tone:'warn'});
+  readImg(f,520,'png',u=>cleanSig(u,v=>{const done=x=>{setSig(tg,x);toast('แนบลายเซ็นแล้ว (ลบพื้นหลังให้แล้ว)');render();};
+   if(v.length<=180000)return done(v);const im=new Image();im.onload=()=>{const k=Math.min(1,360/im.width),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);done(cv.toDataURL('image/png'));};im.onerror=()=>done(v);im.src=v;}),bad);}
  else if(d.std!==undefined||d.hrsu!==undefined){const raw=String(d.std!==undefined?d.std:d.hrsu),T=raw.includes(':')?1:S.term,g=groupsOf(cfgOf(S.scCode,T))[+raw.split(':').pop()],m=metaOf(S.scCode),u=(m.units[uk(T,g.label)]=m.units[uk(T,g.label)]||{});if(d.std!==undefined)u.std=t.value;else u.hrs=t.value;render();}
  else if(d.fw!==undefined||d.fa!==undefined||d.fd!==undefined){const sid=d.fw??d.fa??d.fd,f=S.fix[SKEY()]||(S.fix[SKEY()]={}),x=f[sid]||(f[sid]={});if(d.fw!==undefined)x.why=t.value;else if(d.fa!==undefined)x.after=t.value;else x.date=t.value;render();}
  else if(d.sg){const s=S.sign[SKEY()]||(S.sign[SKEY()]={});s[d.sg]=t.checked;render();}
@@ -644,13 +656,13 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  const avg=a=>{a=a.filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null;};
  const evA=p1?'ประเมินในภาคเรียนที่ 2':evLabOf(avg(rows.map(x=>x.ea))),evR=p1?'ประเมินในภาคเรียนที่ 2':evLabOf(avg(rows.map(x=>x.er)));
  const clubE=Object.entries(S.members).find(([,m])=>(m.ids||[]).includes(s.id));
- const acts=ACTS.map(a=>{if(a==='ชุมนุม')return {n:clubE?`ชุมนุม (${clubE[0]})`:'ชุมนุม',v:clubE?((clubE[1].v||{})[s.id]||'-'):'-'};return {n:a,v:((S.acts[L+'|'+a]||{}).v||{})[s.id]||'-'};});
+ const acts=ACTS.map(a=>{if(a==='ชุมนุม')return {n:'ชุมนุม',v:clubE?((clubE[1].v||{})[s.id]||'-'):'-'};return {n:a,v:((S.acts[L+'|'+a]||{}).v||{})[s.id]||'-'};});
  const actAll=p1?'ประเมินในภาคเรียนที่ 2':acts.some(a=>a.v==='มผ')?'มผ':acts.every(a=>a.v==='ผ')?'ผ':'-';
  const nC=showSc?10:9;
  const line=x=>`<tr><td class="num">${x.c.code}</td><td>${esc(x.c.name)}</td><td class="num">${x.add?'เพิ่มเติม':'พื้นฐาน'}</td><td class="num">${fmtCr(x.cr)}</td>${showSc?`<td class="num${p1?' b':''}">${x.score==null?'-':Math.round(x.score+1e-9)}</td>`:''}<td class="num b">${x.g==null?'-':x.g}</td><td class="num b">${esc(x.after)}</td><td class="num">${x.ea==null?'-':x.ea}</td><td class="num">${x.er==null?'-':x.er}</td><td class="nt"></td></tr>`;
  const aLine=a=>`<tr><td></td><td>${esc(a.n)}</td><td class="num">กิจกรรม</td><td></td>${showSc?'<td class="num">-</td>':''}<td class="num b">${p1?'-':a.v}</td><td></td><td></td><td></td><td></td></tr>`;
  const n=rows.length+acts.length,fs=n<=18?13.5:n<=22?12.5:n<=26?11.5:10.5;
- const sigT=st.t?S.sigs[hr[0]]:null,sigD=st.dir?sc.officers.dir.sig:null;
+ const signer=(st.tBy&&hr.includes(st.tBy))?st.tBy:hr[0],sigT=st.t&&signer?S.sigs[signer]:null,sigD=st.dir?sc.officers.dir.sig:null;
  const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'..............................................'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
  const lvTxt=(pri?'ประถมศึกษาปีที่ ':'มัธยมศึกษาปีที่ ')+L.replace(/^[ปม]\./,'');
  const tTxt=M==='p2'?'ภาคเรียนที่ 2 (ผลการเรียนทั้งปี)':'ภาคเรียนที่ '+T;
@@ -670,11 +682,11 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  <tr><td>ผลการประเมินคุณลักษณะอันพึงประสงค์</td><td class="num" colspan="2">${evA}</td></tr>
  <tr><td>ผลการประเมินการอ่าน คิดวิเคราะห์ และเขียน</td><td class="num" colspan="2">${evR}</td></tr>
  <tr><td>ผลการประเมินกิจกรรมพัฒนาผู้เรียน</td><td class="num" colspan="2">${actAll}</td></tr></tbody></table></div>
- <div class="rpss">${sg(sigT,hr.length?USERS[hr[0]].name:'','ครูที่ปรึกษา')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
+ <div class="rpss">${sg(sigT,signer?USERS[signer].name:'','ครูที่ปรึกษา')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
  <div class="small">${note}คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน · ${crW} 1.0 = 40 ชั่วโมง${pri?'ต่อปี':'ต่อภาคเรียน'}</div></div>`;}
 
 P.report=()=>{const RL=sumLevels();if(!RL.length)return '<div class="card empty">ใบแจ้งผลการเรียนพิมพ์ได้เฉพาะครูที่ปรึกษาประจำชั้น (แอดมินกำหนดครูที่ปรึกษาที่หน้า "ตั้งค่าโรงเรียน")</div>';
- const L=RL.includes(S.rpLevel)?S.rpLevel:RL[0],D=rptData(L),T=D.T,s=D.stus.find(x=>x.id===S.rpStu)||D.stus[0],st=S.rpt[L]||(S.rpt[L]={});
+ const L=RL.includes(S.rpLevel)?S.rpLevel:RL[0];S.rpLevel=L;const _L=L,D=rptData(L),T=D.T,s=D.stus.find(x=>x.id===S.rpStu)||D.stus[0],st=S.rpt[L]||(S.rpt[L]={});
  const ttl={p1:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 1',p2:'ใบแจ้งผลการเรียน ประถม ภาคเรียนที่ 2 (ผลทั้งปี)',s:`ใบแจ้งผลการเรียน มัธยม ภาคเรียนที่ ${T}`}[D.mode];
  const dsc={p1:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4 (แบบเดียวกับมัธยม): แจ้งคะแนนภาคเรียนที่ 1 เต็มวิชาละ 50 ยังไม่ตัดเกรด การประเมินและกิจกรรมแจ้งในภาคเรียนที่ 2',p2:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4 (แบบเดียวกับมัธยม): ผลการเรียนทั้งปี น้ำหนัก ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรม และ GPA',s:'แบบรายงานประจำตัวนักเรียน หน้าเดียว A4: หน่วยกิต ผลสอบปกติ/แก้ตัว คุณลักษณะ อ่าน คิดวิเคราะห์ เขียน กิจกรรมพัฒนาผู้เรียน สรุปหน่วยกิตและ GPA'}[D.mode];
  return `<div class="stack"><div class="row">${RL.map(l=>`<button class="chip" aria-pressed="${l===L}" data-rl="${l}">${l}</button>`).join('')}</div>
@@ -684,7 +696,8 @@ P.report=()=>{const RL=sumLevels();if(!RL.length)return '<div class="card empty"
  <code style="word-break:break-all">${esc(rname(L,s,T))}</code>
  <div class="row"><button class="btn sm" data-act="rdl" data-w="one">PDF รายบุคคล</button><button class="btn sm alt" data-act="rdl" data-w="all">PDF ทั้งห้อง (${D.stus.length} คน คนละหน้า)</button></div>
  <code style="word-break:break-all">${esc(rname(L,null,T))}</code>
- <div class="row">${D.mode==='p1'?'<span class="small muted">ภาคเรียนที่ 1 ประถมแสดงคะแนนเสมอ (ยังไม่มีเกรด)</span>':`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`}<label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${isAdmin()?`<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
+ <div class="row">${D.mode==='p1'?'<span class="small muted">ภาคเรียนที่ 1 ประถมแสดงคะแนนเสมอ (ยังไม่มีเกรด)</span>':`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`}<label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${(HOMEROOM[L]||[]).length>1&&(isAdmin()||(HOMEROOM[L]||[]).includes(S.role))?`<label class="small">ผู้ลงนาม <select data-rsgby="1">${(HOMEROOM[L]||[]).map(u=>`<option value="${u}" ${((st.tBy&&(HOMEROOM[L]||[]).includes(st.tBy))?st.tBy:(HOMEROOM[L]||[])[0])===u?'selected':''}>${esc(USERS[u].name)}</option>`).join('')}</select></label>`:''}${st.t&&!S.sigs[(st.tBy&&(HOMEROOM[L]||[]).includes(st.tBy))?st.tBy:(HOMEROOM[L]||[])[0]]?`<span class="small" style="color:var(--bad)">ครูที่ปรึกษาผู้ลงนามยังไม่มีลายเซ็นในระบบ (สร้างที่เมนู "ลายเซ็นของฉัน")</span>`:''}${isAdmin()?`<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
+ ${(()=>{const am=actMissing(L);return am.length?`<div class="lock small"><b>⚠️ ผลกิจกรรมพัฒนาผู้เรียนยังไม่ครบ</b> ใบแจ้งผลจะแสดง “-” ในช่องที่ยังไม่ตัดสิน: ${am.map(x=>`${esc(x.a)} (${x.noClub?'ยังไม่มีชุมนุม '+x.miss+' คน':'ยังไม่ตัดสิน '+x.miss+' คน'} · ${esc(x.noClub?'':x.whoTxt)})`).join(' · ')} <button class="btn sm alt" data-go="acts" data-actgo="${L}">ไปกรอกกิจกรรม</button></div>`:'';})()}
  ${D.cal.length?'':'<div class="card empty">ชั้นนี้ยังไม่มีรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}
  ${D.stus.length&&D.cal.length?rptPage(L,s,D):''}</div>`;};
 // ===== เผยแพร่ผลการเรียนให้นักเรียนดูออนไลน์ =====
@@ -709,7 +722,7 @@ function pubData(L,s,D){const T=D.T,M=D.mode,pri=D.pri,p1=M==='p1';
  const gr=rows.filter(x=>x.eff!=null),gpa=!p1&&gr.length?Math.round(gr.reduce((a,x)=>a+x.eff*x.cr,0)/sum(gr)*100)/100:null;
  const avg=a=>{a=a.filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null;};
  const clubE=Object.entries(S.members).find(([,m])=>(m.ids||[]).includes(s.id));
- const acts=ACTS.map(a=>a==='ชุมนุม'?{n:clubE?`ชุมนุม (${clubE[0]})`:'ชุมนุม',v:clubE?((clubE[1].v||{})[s.id]||'-'):'-'}:{n:a,v:((S.acts[L+'|'+a]||{}).v||{})[s.id]||'-'});
+ const acts=ACTS.map(a=>a==='ชุมนุม'?{n:'ชุมนุม',v:clubE?((clubE[1].v||{})[s.id]||'-'):'-'}:{n:a,v:((S.acts[L+'|'+a]||{}).v||{})[s.id]||'-'});
  return {year:S.year,term:T,level:L,mode:M,crW:pri?'น้ำหนัก':'หน่วยกิต',full:p1?50:100,name:s.name,no:s.no||'',sid:String(s.sid||''),
   subjects:rows.map(({eff,...x})=>x),gpa,crAll:sum(rows),crGot:p1?null:got(rows),
   evA:p1?null:evLabOf(avg(rows.map(x=>x.ea))),evR:p1?null:evLabOf(avg(rows.map(x=>x.er))),
@@ -719,6 +732,7 @@ function pubInfo(L,T){const D=rptData(L,T),datas=D.stus.map(s=>pubData(L,s,D));
 async function pubLevel(L){if(S.tpl)return;const T=S.term,key=pubId(T),I=pubInfo(L,T),D=I.D;
  if(!D.stus.length)return toast('ชั้นนี้ยังไม่มีนักเรียน');
  if(I.sent<I.tot&&!(await ask({title:'ครูยังส่งผลไม่ครบ',text:`ชั้น ${L} ส่งผลแล้ว ${I.sent} จาก ${I.tot} วิชา\nวิชาที่ยังไม่ส่ง นักเรียนจะเห็นผลเท่าที่ครูกรอกไว้ ณ ตอนนี้\n\nเผยแพร่เลยไหม?`,ok:'เผยแพร่',cancel:'ยังไม่เผยแพร่'})))return;
+ const am=actMissing(L);if(am.length&&!(await ask({title:'ผลกิจกรรมพัฒนาผู้เรียนยังไม่ครบ',text:`ชั้น ${L}: ${am.map(x=>x.a+(x.noClub?' (ยังไม่มีชุมนุม '+x.miss+' คน)':' (ยังไม่ตัดสิน '+x.miss+' คน)')).join('\n')}\n\nใบแจ้งผลจะแสดง "-" ในช่องกิจกรรมที่ยังไม่ตัดสิน เผยแพร่เลยไหม?`,ok:'เผยแพร่',cancel:'ยังไม่เผยแพร่'})))return;
  S.pubBusy=L;render();
  const st=S.rpt[L]||(S.rpt[L]={}),keep=st.sc;
  try{const b=writeBatch(db),ids=[];
@@ -747,7 +761,7 @@ P.publish=()=>{if(!isAdmin())return '<div class="card empty">หน้านี�
   const st=p?(p.hash===I.hash?'pub':'changed'):(I.tot&&I.sent>=I.tot?'ready':'part'),busy=S.pubBusy===L;
   const sub=p?`เมื่อ ${dt(p.at)}${p.by?' โดย '+esc(p.by):''}`:I.sent<I.tot?`ขาด ${I.tot-I.sent} วิชา`:'';
   return `<tr><td><b>${L}</b></td><td class="num">${n}</td><td>${I.sent} / ${I.tot} วิชา</td>
-  <td><span class="pill ${PILL[st][1]}">${PILL[st][0]}</span>${sub?`<div class="small muted">${sub}</div>`:''}${I.noSid?`<div class="small" style="color:var(--bad)">ไม่มีเลขประจำตัว ${I.noSid} คน (เข้าดูผลไม่ได้)</div>`:''}</td>
+  <td><span class="pill ${PILL[st][1]}">${PILL[st][0]}</span>${sub?`<div class="small muted">${sub}</div>`:''}${I.noSid?`<div class="small" style="color:var(--bad)">ไม่มีเลขประจำตัว ${I.noSid} คน (เข้าดูผลไม่ได้)</div>`:''}${(()=>{const am=actMissing(L);return am.length?`<div class="small" style="color:var(--warn,#8a4206)">กิจกรรมยังไม่ครบ: ${am.map(x=>esc(x.a)).join(', ')}</div>`:''})()}</td>
   <td style="text-align:right;white-space:nowrap">${busy?'<span class="small muted">กำลังบันทึก…</span>':`${st!=='pub'?`<button class="btn sm" data-pub="${L}">${p?'เผยแพร่ใหม่':'เผยแพร่'}</button>`:''}${p?` <button class="btn sm alt" data-unpub="${L}">ยกเลิกเผยแพร่</button>`:''}`}</td></tr>`;}).join('');
  const seg=(v,label)=>`<button class="chip" aria-pressed="${o.score===v}" data-pubopt="score" data-v="${v?1:0}">${label}</button>`;
  const chk=(k,label)=>`<label class="row" style="gap:8px;min-height:40px"><input type="checkbox" data-pubchk="${k}" ${o[k]?'checked':''}> ${label}</label>`;
@@ -804,11 +818,34 @@ function scoreXlCard(){return `<div class="card stack"><h3>กรอกคะแ
  <div class="row"><button class="btn sm" data-act="xltpl">ดาวน์โหลดแบบกรอกคะแนน (Excel)</button><label class="btn sm alt" style="cursor:pointer">แนบไฟล์คะแนน (.xlsx / .csv)<input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-xlimp hidden></label></div></div>`;}
 reg('click',e=>{const t=e.target.closest('[data-act=xltpl]');if(t&&$('#view')&&$('#view').contains(t))scoreTplDownload();});
 reg('change',e=>{const t=e.target;if(t.dataset&&t.dataset.xlimp!==undefined&&t.files&&t.files[0]){const f=t.files[0];t.value='';scoreImport(f);}});
+// ===== กิจกรรมพัฒนาผู้เรียนที่ยังไม่ได้ตัดสิน (ต้องมีในใบแจ้งผล) — ประถมภาคเรียนที่ 1 ไม่ต้องตัดสิน =====
+function actMissing(L){if(actLockT(L))return [];const stu=ACT().filter(s=>s.level===L);if(!stu.length)return [];const out=[];
+ ACTS.filter(a=>a!=='ชุมนุม').forEach(a=>{const v=((S.acts[L+'|'+a]||{}).v)||{},miss=stu.filter(s=>!v[s.id]).length;const t=tOf(a,L);
+  if(miss)out.push({a,L,miss,total:stu.length,who:t?[t]:(HOMEROOM[L]||[]),whoTxt:t?USERS[t].name:((HOMEROOM[L]||[]).map(u=>USERS[u].name).join(', ')||'ยังไม่กำหนดครูที่ปรึกษา')});});
+ const noClub=stu.filter(s=>!clubOfStu(s.id));
+ if(noClub.length)out.push({a:'ชุมนุม',L,miss:noClub.length,total:stu.length,who:isAdmin()?[]:[],whoTxt:'ยังไม่มีชุมนุม '+noClub.length+' คน (แอดมิน/ครูผู้สอนชุมนุมเพิ่มสมาชิก)',noClub:true});
+ Object.entries(S.members).forEach(([n,m])=>{const ids=(m.ids||[]).filter(id=>stu.some(s=>s.id===id)),miss=ids.filter(id=>!(m.v||{})[id]).length;
+  if(miss)out.push({a:'ชุมนุม: '+n,L,miss,total:ids.length,who:[m.owner],whoTxt:USERS[m.owner].name});});
+ return out;}
+function actMissingAll(){return LEVELS.flatMap(L=>actMissing(L));}
+function actMissCard(){const all=actMissingAll(),mine=isAdmin()?all:all.filter(x=>x.who.includes(S.role));
+ const T=S.term;if(!mine.length)return isAdmin()&&ACT().length?`<div class="card stack"><h3>กิจกรรมพัฒนาผู้เรียน · ภาคเรียนที่ ${T}</h3><div class="small" style="color:var(--good,#1f6b44);font-weight:700">✓ ตัดสินผลกิจกรรมครบทุกชั้นแล้ว${T===1?' (ประถมตัดสินในภาคเรียนที่ 2)':''}</div></div>`:'';
+ const byL={};mine.forEach(x=>(byL[x.L]=byL[x.L]||[]).push(x));
+ return `<div class="card stack actmiss"><div class="row" style="justify-content:space-between"><h3>⚠️ กิจกรรมพัฒนาผู้เรียนที่ยังไม่ได้ตัดสิน${isAdmin()?'':' (งานของคุณ)'}</h3>${isAdmin()?`<button class="btn sm" data-act="actnotify">ส่งแจ้งเตือนครูที่ยังไม่ตัดสิน</button>`:''}</div>
+ <div class="small muted">ผลแนะแนว ลูกเสือ-เนตรนารี กิจกรรมเพื่อสังคมฯ และชุมนุม ต้องมีในใบแจ้งผลการเรียน${T===1?' · ประถมภาคเรียนที่ 1 ไม่ต้องตัดสิน (ตัดสินภาคเรียนที่ 2)':''}</div>
+ <div class="amgrid">${Object.entries(byL).map(([L,xs])=>`<div class="amlv"><b>${L}</b><ul>${xs.map(x=>`<li><span>${esc(x.a)}</span><em>${x.noClub?esc(x.whoTxt):`ยังไม่ตัดสิน ${x.miss}/${x.total} คน · ${esc(x.whoTxt)}`}</em></li>`).join('')}</ul><button class="btn sm alt" data-go="acts" data-actgo="${L}">ไปกรอกกิจกรรม ${L}</button></div>`).join('')}</div></div>`;}
+reg('click',e=>{const t=e.target.closest('[data-actgo],[data-act=actnotify]');if(!t||!$('#view')||!$('#view').contains(t))return;
+ if(t.dataset.actgo){S.actLevel=t.dataset.actgo;return;}
+ const per={};actMissingAll().forEach(x=>x.who.forEach(u=>(per[u]=per[u]||[]).push(`${x.L} ${x.a} (${x.miss} คน)`)));
+ const us=Object.keys(per);if(!us.length)return toast('ไม่มีครูที่ต้องแจ้ง');
+ us.forEach(u=>notify(u,`กรุณาตัดสินผลกิจกรรมพัฒนาผู้เรียน ภาคเรียนที่ ${S.term}: ${per[u].slice(0,6).join(', ')}${per[u].length>6?' …':''}`,'acts'));
+ toast(`ส่งแจ้งเตือนครู ${us.length} คนแล้ว`);});
 const PRI_L=['ป.1','ป.2','ป.3','ป.4','ป.5','ป.6'];
 reg('click',e=>{const t=e.target.closest('[data-rl],[data-act=rdl]');if(!t)return;const d=t.dataset;
  if(d.rl){S.rpLevel=d.rl;S.rpStu=null;render();}
  else{const L=S.rpLevel||'ป.3',s=STU.find(x=>x.id===S.rpStu)||STU.find(x=>x.level===L);toast('ตัวอย่าง: ระบบจริงจะดาวน์โหลด '+(d.w==='all'?rname(L,null):rname(L,s)));}});
-reg('change',e=>{const t=e.target;if(t.id==='rpst'){S.rpStu=t.value;render();}else if(t.dataset.rsg){const L=S.rpLevel||'ป.3';(S.rpt[L]=S.rpt[L]||{})[t.dataset.rsg]=t.checked;render();}});
+reg('change',e=>{const t=e.target;if(t.id==='rpst'){S.rpStu=t.value;render();}else if(t.dataset.rsg){const L=S.rpLevel||'ป.3',st=(S.rpt[L]=S.rpt[L]||{});st[t.dataset.rsg]=t.checked;if(t.dataset.rsg==='t'&&t.checked&&(HOMEROOM[L]||[]).includes(S.role))st.tBy=S.role;render();}
+ else if(t.dataset.rsgby){const L=S.rpLevel||'ป.3';(S.rpt[L]=S.rpt[L]||{}).tBy=t.value;render();}});
 
 function stickNames(){document.querySelectorAll('#view .tw').forEach(w=>{const t=w.querySelector('table'),h=t&&t.querySelector('thead tr');if(!h)return;if(w.scrollWidth<=w.clientWidth+2){w.classList.remove('stk','stk1');return;}
  const th=[...h.children],i=th.findIndex(x=>/ชื่อ/.test(x.textContent)&&!(x.colSpan>1));if(i<0||i>1)return;
@@ -1277,7 +1314,7 @@ function flush(id) {
   setDoc(doc(db, 'work', id), { year: S.year, bucket: b, sub, json: j, by: S.role, at: Date.now() })
     .then(() => { if (pending[id] === j) delete pending[id] }).catch(report)
 }
-function report(err) { console.error(err); toast('บันทึกไม่สำเร็จ: ' + (err.code === 'permission-denied' ? 'ไม่มีสิทธิ์แก้ข้อมูลส่วนนี้' : err.message)) }
+function report(err) { console.error(err); const m = String(err && err.message || err); toast('บันทึกไม่สำเร็จ: ' + (err && err.code === 'permission-denied' ? 'ไม่มีสิทธิ์แก้ข้อมูลส่วนนี้' : /exceeds|maximum|too large|bytes/i.test(m) ? 'ข้อมูลใหญ่เกินไป (ภาพลายเซ็นหรือรูปใหญ่) ลองวาดลายเซ็นในกรอบหรือใช้ภาพที่ครอปเหลือแต่ลายเซ็น' : m)) }
 let lastSettings = null
 function settingsJson() { return JSON.stringify({ school: S.school, homeroom: HOMEROOM, guidance: S.guidance, actTeach: S.actTeach || {}, names: NAMES }) }
 function persistSettings() {
@@ -1285,7 +1322,10 @@ function persistSettings() {
   TEACHERS.forEach((t) => (NAMES[t.uid] = t.name))
   const j = settingsJson(); if (j === lastSettings) return
   lastSettings = j
-  setDoc(doc(db, 'settings', 'school'), { json: j, at: Date.now() }).catch(report)
+  const sv = Object.keys(S.sigSt).filter((t) => !t.startsWith('u:') && S.sigSt[t].state === 'saving')
+  setDoc(doc(db, 'settings', 'school'), { json: j, at: Date.now() })
+    .then(() => { if (sv.length) { sv.forEach((t) => sigMark(t, 'ok')); softRender() } })
+    .catch((e) => { sv.forEach((t) => sigMark(t, 'err', /exceeds|maximum|bytes/i.test(String(e && e.message)) ? '(ข้อมูลใหญ่เกิน)' : '')); report(e); softRender() })
 }
 let lastSig
 function persistSig() {
@@ -1293,8 +1333,11 @@ function persistSig() {
   const cur = S.sigs[S.role] || null
   if (cur === lastSig) return
   lastSig = cur
-  if (cur) setDoc(doc(db, 'sigs', S.role), { data: cur, at: Date.now() }).catch(report)
-  else deleteDoc(doc(db, 'sigs', S.role)).catch(() => {})
+  if (cur) setDoc(doc(db, 'sigs', S.role), { data: cur, at: Date.now() })
+    .then(() => { sigMark('u:' + S.role, 'ok'); softRender() })
+    .catch((e) => { sigMark('u:' + S.role, 'err', e && e.code === 'permission-denied' ? '(ไม่มีสิทธิ์)' : ''); report(e); softRender() })
+  // ลบออกจากระบบเฉพาะเมื่อผู้ใช้กด "ลบลายเซ็น" เอง (กันลายเซ็นหายจากจังหวะโหลดข้อมูล)
+  else if (S.sigDelReq) { S.sigDelReq = false; deleteDoc(doc(db, 'sigs', S.role)).catch(() => {}) }
 }
 function applySettings(j) {
   const o = JSON.parse(j), d = defaultSchool()
