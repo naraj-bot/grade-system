@@ -200,7 +200,8 @@ function TeacherView({ regs, all }) {
     const saved = mine ? (mine.reqCodes || mine.codes) : []
     const removed = saved.filter((code) => !picked.has(code))
     if (removed.length && !(await ask({ title: `เอาวิชาออก ${removed.length} วิชา?`, text: removed.map((code) => { const x = catalog.find((y) => y.code === code); return x ? `${x.level} ${code} ${x.name}` : code }).join('\n') + '\n\nถ้าไม่ได้ตั้งใจเอาออก กด "ไม่ใช่" แล้วติ๊กกลับ', ok: 'ใช่ เอาออก', cancel: 'ไม่ใช่', danger: true }))) return
-    const codes = [...picked].filter((code) => levels.has(catalog.find((x) => x.code === code)?.level))
+    // ดูทีละชั้นแล้ว จึงใช้วิชาที่ติ๊กไว้ทุกชั้น (เดิมกรองด้วยชั้นที่เลือก ทำให้วิชาของชั้นที่เพิ่งติ๊กหายไปตอนบันทึก)
+    const codes = [...picked].filter((code) => catalog.some((x) => x.code === code))
     if (!codes.length) return tell({ title: 'ยังไม่ได้เลือกวิชา', text: 'เลือกวิชาที่สอนอย่างน้อย 1 วิชา', tone: 'warn' })
     const dup = codes.filter((code) => takenMap[code] && !(mine?.codes || []).includes(code))
     if (dup.length) {
