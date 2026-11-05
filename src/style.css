@@ -356,7 +356,8 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .rs3{min-width:640px}.rs3 td.b{font-weight:700}.rs3 td.nt{font-size:.8rem;color:#555}
 .rpsb{display:grid;grid-template-columns:minmax(0,58%) 1fr;gap:16px;align-items:start}
 .rsum{min-width:0}.rpss{display:grid;gap:10px}
-@media (max-width:640px){.rpsb{grid-template-columns:1fr}}
+.rpsb.two{grid-template-columns:minmax(0,50%) 1fr}.rpss.two{grid-template-columns:1fr 1fr;gap:8px}.rpss.two .sg{font-size:.82rem}
+@media (max-width:640px){.rpsb,.rpsb.two{grid-template-columns:1fr}}
 
 /* ===== หน้าแรก (ยังไม่ล็อกอิน) จบในหน้าเดียว ===== */
 .nw{display:inline-block;white-space:nowrap;margin-right:.3em}
@@ -428,7 +429,7 @@ label.ed{display:grid;gap:4px;font-weight:600;margin-bottom:10px}label.ed input,
 .sp-sum{background:#4a0f0f;color:#fbeee9;border-radius:22px;padding:18px;display:grid;gap:14px}
 .sp-who b{display:block;font:700 20px var(--f-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sp-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:13px}.sp-tags span{white-space:nowrap;background:rgba(255,255,255,.12);padding:3px 10px;border-radius:999px}
-.sp-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;text-align:center;border-top:1px solid rgba(255,255,255,.18);padding-top:12px}
+.sp-stats{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px;text-align:center;border-top:1px solid rgba(255,255,255,.18);padding-top:12px}
 .sp-stats>div{display:flex;flex-direction:column;gap:2px;padding:6px 0}.sp-stats span{font-size:12px;color:#e6c9c0;white-space:nowrap}.sp-stats b{font:700 20px var(--f-display)}
 .sp-stats .gpa{background:#fff6e6;border-radius:14px;color:#8c1c1c}.sp-stats .gpa span{color:#5c4743}
 .sp-note{background:var(--gold-soft);color:var(--gold-ink);border-radius:14px;padding:10px 14px;font-size:14px}

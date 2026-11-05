@@ -2,12 +2,12 @@
 // นักเรียนดูผลการเรียนที่แอดมินเผยแพร่แล้ว (ไม่ต้องล็อกอิน)
 //  - อ่านจาก published/* ด้วย Admin SDK เท่านั้น (ฝั่งเว็บอ่าน collection นี้ไม่ได้)
 //  - ตัดข้อมูลตามตัวเลือกใน publishMeta/{ปี_ภาค}.opts (คะแนน / ผลประเมิน / กิจกรรม / PDF)
-//  - กันการสุ่มเลขประจำตัว: กรอกผิดเกิน 10 ครั้งใน 15 นาที (ต่อ IP) จะถูกพักการค้นชั่วคราว
+//  - กันการสุ่มเลขประจำตัว: กรอกผิดเกิน 40 ครั้งใน 15 นาที (ต่อ IP) จะถูกพักการค้นชั่วคราว
 import crypto from 'node:crypto'
 import { adminDb } from './_admin.js'
 
 const WINDOW_MS = 15 * 60 * 1000
-const MAX_FAILS = 10
+const MAX_FAILS = 40 // ต่อ IP: เครือข่ายโรงเรียน/มือถือใช้ IP ร่วมกันหลายคน จึงตั้งสูงพอไม่ให้ผู้ปกครองถูกพักพร้อมกัน
 const DEFAULT_OPTS = { score: true, ev: true, act: true, pdf: true }
 const send = (res, status, body) => {
   res.setHeader('Cache-Control', 'no-store')
@@ -36,7 +36,7 @@ function shape(doc, opts) {
   const d = doc.data
   const out = {
     year: d.year, term: d.term, level: d.level, mode: d.mode, crW: d.crW, full: d.full,
-    gpa: d.gpa, crAll: d.crAll, crGot: d.crGot, publishedAt: doc.at,
+    gpa: d.gpa, crAll: d.crAll, crGot: d.crGot, hideCr: !!d.hideCr, publishedAt: doc.at,
     subjects: d.subjects.map((x) => ({
       code: x.code, name: x.name, type: x.type, cr: x.cr, grade: x.grade, after: x.after,
       ...(opts.score || d.mode === 'p1' ? { score: x.score } : {}),

@@ -44,4 +44,5 @@ thead{display:table-header-group}tr{break-inside:avoid}
 .rs3 th{font-size:calc(var(--rfs,13.5pt) - 1pt)!important;line-height:1}.rs3 td.b{font-weight:700}.rs3 td.nt{font-size:10.5pt!important;line-height:1}
 .rpsb{display:grid!important;grid-template-columns:58% 1fr;gap:5mm;align-items:start}.rsum{table-layout:auto}.rsum td{font-size:13pt!important}
 .rpss{display:grid!important;gap:4mm}.rpss .sg{font-size:13pt;margin-top:2mm}
+.rpsb.two{grid-template-columns:50% 1fr!important}.rpss.two{grid-template-columns:1fr 1fr;gap:3mm 2mm}.rpss.two .sg{font-size:11.5pt;margin-top:1mm}
 `

@@ -139,14 +139,14 @@ function ResultView({ stu, onLogout, onTerm, busy }) {
                 <div className="gpa"><span>คะแนนรวม</span><b>{sc.length ? tot : '-'}</b><small>/ {max || '-'}</small></div>
                 <div><span>เฉลี่ย</span><b>{max ? Math.round((tot / max) * 100) + '%' : '-'}</b></div>
                 <div><span>รายวิชา</span><b>{r.subjects.length}</b></div>
-                <div><span>{r.crW}ที่ลง</span><b>{cr1(r.crAll)}</b></div>
+                {!r.hideCr && <div><span>{r.crW}ที่ลง</span><b>{cr1(r.crAll)}</b></div>}
               </div>
             )
           })() : (
           <div className="sp-stats">
             <div className="gpa"><span>GPA</span><b>{r.gpa == null ? '-' : r.gpa.toFixed(2)}</b></div>
-            <div><span>{r.crW}ที่ลง</span><b>{cr1(r.crAll)}</b></div>
-            <div><span>{r.crW}ที่ได้</span><b>{p1 ? '-' : cr1(r.crGot)}</b></div>
+            {!r.hideCr && <div><span>{r.crW}ที่ลง</span><b>{cr1(r.crAll)}</b></div>}
+            {!r.hideCr && <div><span>{r.crW}ที่ได้</span><b>{p1 ? '-' : cr1(r.crGot)}</b></div>}
             <div><span>กิจกรรม</span><b>{r.actAll == null ? '-' : r.actAll === 'ผ' ? 'ผ่าน' : r.actAll === 'มผ' ? 'ไม่ผ่าน' : '-'}</b></div>
           </div>
           )}
@@ -164,7 +164,7 @@ function ResultView({ stu, onLogout, onTerm, busy }) {
                     <b>{x.score ?? '-'}</b><small>/{r.full || 50}</small>
                   </div>
                   <div className="sp-info">
-                    <div className="sp-meta"><span>{x.code} · {x.type}</span><span>{cr1(x.cr)} {r.crW}</span></div>
+                    <div className="sp-meta"><span>{x.code} · {x.type}</span>{!r.hideCr && <span>{cr1(x.cr)} {r.crW}</span>}</div>
                     <b className="sp-name">{x.name.split(/ (?![0-9])/).map((t, i) => <span key={i} className="nw">{t}</span>)}</b>
                     {pc == null ? <span className="sp-sub">ยังไม่มีคะแนน</span> : (
                       <div className="sp-bar" role="img" aria-label={`${pc} เปอร์เซ็นต์`}><span className="tr"><i style={{ width: pc + '%' }} /></span><span className="pc">{pc}%</span></div>
@@ -177,7 +177,7 @@ function ResultView({ stu, onLogout, onTerm, busy }) {
               <div className="sp-row" key={x.code}>
                 <div className={`sp-g ${gradeTone(g)}`} aria-label={`ผลการเรียน ${g ?? '-'}`}>{g ?? '-'}</div>
                 <div className="sp-info">
-                  <div className="sp-meta"><span>{x.code} · {x.type}</span><span>{cr1(x.cr)} {r.crW}</span></div>
+                  <div className="sp-meta"><span>{x.code} · {x.type}</span>{!r.hideCr && <span>{cr1(x.cr)} {r.crW}</span>}</div>
                   <b className="sp-name">{x.name.split(/ (?![0-9])/).map((t, i) => <span key={i} className="nw">{t}</span>)}</b>
                   {(r.showScore || (x.after !== '' && x.after != null)) && (
                     <span className="sp-sub">{r.showScore && x.score != null ? `คะแนน ${x.score} / ${r.full}` : ''}{x.after !== '' && x.after != null ? `${r.showScore && x.score != null ? ' · ' : ''}ผลเดิม ${x.grade ?? '-'} แก้ตัวเป็น ${x.after}` : ''}</span>
