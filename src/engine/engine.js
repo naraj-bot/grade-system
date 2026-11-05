@@ -301,7 +301,7 @@ P.scores=()=>{
  <div class="card stack"><h3>ตั้งค่าการเก็บคะแนนของวิชานี้</h3>
   ${pri?`<div class="row"><label for="scl">การเก็บคะแนนต่อภาคเรียน</label><select id="scl"><option value="100" ${cfg.scale===100?'selected':''}>เก็บเต็ม 100 (ระบบย่อเหลือ 50)</option><option value="50" ${cfg.scale===50?'selected':''}>เก็บเต็ม 50 ต่อภาคเรียนเลย</option></select></div>`:''}
   <div class="row"><label for="hrs">จำนวนชั่วโมงเรียนทั้งหมดของภาคเรียน</label><input id="hrs" type="number" min="1" value="${H}" style="width:90px"><span class="small muted">ค่าเริ่มต้นทุกคนมาเรียนครบ กรอกเฉพาะชั่วโมงที่ขาด ถ้าเวลาเรียนต่ำกว่า 80% ระบบให้ มส. ไม่ตัดเกรด</span></div>
-  <div class="row"><label for="crd">${pri?'น้ำหนัก (ต่อปี)':'หน่วยกิต'}</label><input id="crd" type="number" min="0.5" step="0.5" value="${credSet(c.code,S.term,pri)??''}" placeholder="${credAuto(c.code,S.term,pri)}" style="width:90px"><span class="small muted">ตั้งตามโครงสร้างหลักสูตร เช่น 0.5 / 1.0 / 1.5 / 2.0 (เว้นว่าง = ใช้ ${credAuto(c.code,S.term,pri)} คำนวณจากชั่วโมง ÷ 40) · ใช้คิด GPA และแสดงในใบแจ้งผล ไม่เกี่ยวกับการเช็คชื่อ</span></div>
+  <div class="row"><label for="crd">${pri?'น้ำหนัก (ต่อปี)':'หน่วยกิต'}</label><select id="crd" style="width:auto"><option value="" ${credSet(c.code,S.term,pri)==null?'selected':''}>ตามชั่วโมง (${credAuto(c.code,S.term,pri).toFixed(1)})</option>${CRV.map(v=>`<option value="${v}" ${credSet(c.code,S.term,pri)===v?'selected':''}>${v.toFixed(1)}</option>`).join('')}</select><span class="small muted">มีได้เฉพาะ 0.5 / 1.0 / 1.5 / 2.0 ตามโครงสร้างหลักสูตร (เลือก “ตามชั่วโมง” = ชั่วโมงเรียน ÷ 40 ปัดเป็น 0.5 ไม่เกิน 2.0) · ใช้คิด GPA และแสดงในใบแจ้งผล ไม่เกี่ยวกับการเช็คชื่อ</span></div>
   <div class="small muted">คะแนนระหว่างภาคเต็ม ${F.mid} · ปลายภาคเต็ม ${F.fin} · แบ่งช่องคะแนนเก็บได้ตามที่ครูใช้ (ช่องเดียวหรือหลายช่อง)</div>
   ${cfg.cols.map((k,i)=>`<div class="row"><input data-cn="${i}" value="${esc(k.n)}" aria-label="ชื่อคะแนนช่องที่ ${i+1}" placeholder="ชื่อคะแนน เช่น ชิ้นงาน" size="16"><input data-cu="${i}" value="${esc(k.u||'')}" aria-label="หน่วยการเรียนรู้ของช่องที่ ${i+1}" placeholder="หน่วยที่ (ถ้ามี)" size="12"><label class="small muted" for="cm${i}">เต็ม</label><input id="cm${i}" type="number" min="1" data-cm="${i}" value="${k.max}" ${cfg.cols.length===1?'disabled':''} style="width:80px">${cfg.cols.length>1?`<button class="btn sm alt" data-act="delcol" data-i="${i}">ลบช่อง</button>`:''}</div>`).join('')}
   <div class="row"><button class="btn sm alt" data-act="addcol">เพิ่มช่องคะแนนเก็บ</button><span class="pill ${ok?'p-good':'p-warn'}">${ok?'รวมคะแนนเก็บครบ '+F.mid:'รวมช่องคะแนน '+sumMax+' ต้องเท่ากับ '+F.mid}</span></div></div>
@@ -642,17 +642,18 @@ const rname=(L,s,T)=>`ใบแจ้งผลการเรียน_${L}_ภ�
 //  ประถม ภาค 2 (p2): คะแนนรวมทั้งปี เต็ม 100 · ตัดเกรดและประเมินทั้งปี
 const EVN=lab=>lab?3-EVL.indexOf(lab):null;
 const evLabOf=m=>m==null?'-':EVL[3-(m>=2.5?3:m>=1.5?2:m>=1?1:0)];
-// หน่วยกิต/น้ำหนัก: ครูตั้งเองได้ (cfg.credit) ไม่ผูกกับชั่วโมงเช็คชื่อ · ถ้าไม่ตั้ง ใช้ชั่วโมง ÷ 40 ปัดเป็นทีละ 0.5 (กันค่าแปลก เช่น 84 ชม. → 2.1)
+// หน่วยกิต/น้ำหนักมีได้เฉพาะ 0.5 / 1.0 / 1.5 / 2.0 · ครูตั้งเองได้ (cfg.credit) ไม่ผูกกับชั่วโมงเช็คชื่อ · ถ้าไม่ตั้ง ใช้ชั่วโมง ÷ 40 ปัดเป็นทีละ 0.5 ไม่เกิน 2.0 (เช่น 84 ชม. → 2.0)
 const crKeyT=(T,pri)=>pri?1:T;
-const credSet=(code,T,pri)=>{const v=cfgOf(code,crKeyT(T,pri)).credit;return v!=null&&v!==''&&+v>0?+v:null;};
-const credAuto=(code,T,pri)=>{const r=x=>Math.max(0.5,Math.round(x*2)/2);return pri?r(((+cfgOf(code,1).hours||40)+(+cfgOf(code,2).hours||40))/40):r((+cfgOf(code,T).hours||40)/40);};
+const CRV=[0.5,1,1.5,2];
+const credSet=(code,T,pri)=>{const v=cfgOf(code,crKeyT(T,pri)).credit;if(v==null||v==='')return null;const n=+v;if(!isFinite(n)||n<=0)return null;return Math.min(2,Math.max(0.5,Math.round(n*2)/2));}; // ค่าเก่าที่ไม่ใช่ 0.5/1/1.5/2 (เช่น 2.1) ปัดเป็นค่าที่ใกล้ที่สุดให้เอง
+const credAuto=(code,T,pri)=>{const r=x=>Math.min(2,Math.max(0.5,Math.round(x*2)/2));return pri?r(((+cfgOf(code,1).hours||40)+(+cfgOf(code,2).hours||40))/40):r((+cfgOf(code,T).hours||40)/40);};
 const credOf=(code,T,pri)=>{const v=credSet(code,T,pri);return v!=null?v:credAuto(code,T,pri);};
 const fmtCr=x=>(Math.round(x*10)/10).toFixed(1);
 // ครูที่ปรึกษาผู้ลงนามในใบแจ้งผล: 1 คน (เลือกได้) หรือทั้งสองคน (tBy==='both')
 const rpSigners=(hr,st)=>st.tBy==='both'&&hr.length>1?hr.slice(0,2):[(st.tBy&&hr.includes(st.tBy))?st.tBy:hr[0]].filter(Boolean);
 const rpTBy=(hr,st)=>st.tBy==='both'&&hr.length>1?'both':((st.tBy&&hr.includes(st.tBy))?st.tBy:hr[0]);
 function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rpt[L]||{},T=D.T,M=D.mode,pri=D.pri,p1=M==='p1';
- const showSc=p1||st.sc!==false,showCr=!pri||st.cw!==false,crW=pri?'น้ำหนัก':'หน่วยกิต',full=p1?50:100;
+ const showSc=p1||st.sc!==false,showCr=st.cw!==false,crW=pri?'น้ำหนัก':'หน่วยกิต',full=p1?50:100;
  const rows=D.cal.map(x=>{const c=x.c,r=x.R.find(q=>q.s.id===s.id)||{},k=c.code+'|'+T,fx=((S.fix[k]||{})[s.id])||{},ev=((S.ev[k]||{})[s.id])||{};
   const g=p1?null:r.g,after=p1?'':String(fx.after||'').trim(),afN=after!==''&&!isNaN(+after)?+after:null;
   const eff=afN!=null?afN:(typeof g==='number'?g:null),score=p1?r.cur:M==='p2'?r.sum:r.tot;
@@ -705,7 +706,7 @@ P.report=()=>{const RL=sumLevels();if(!RL.length)return '<div class="card empty"
  <code style="word-break:break-all">${esc(rname(L,s,T))}</code>
  <div class="row"><button class="btn sm" data-act="rdl" data-w="one">PDF รายบุคคล</button><button class="btn sm alt" data-act="rdl" data-w="all">PDF ทั้งห้อง (${D.stus.length} คน คนละหน้า)</button></div>
  <code style="word-break:break-all">${esc(rname(L,null,T))}</code>
- <div class="row">${D.mode==='p1'?'<span class="small muted">ภาคเรียนที่ 1 ประถมแสดงคะแนนเสมอ (ยังไม่มีเกรด)</span>':`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`}${D.pri?`<label><input type="checkbox" data-rsg="cw" ${st.cw!==false?'checked':''}> แสดงน้ำหนักรายวิชา (ในใบแจ้งผลและหน้านักเรียนดูผลออนไลน์)</label>`:''}<label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${(HOMEROOM[L]||[]).length>1&&(isAdmin()||(HOMEROOM[L]||[]).includes(S.role))?`<label class="small">ผู้ลงนาม <select data-rsgby="1">${(HOMEROOM[L]||[]).map(u=>`<option value="${u}" ${rpTBy(HOMEROOM[L]||[],st)===u?'selected':''}>${esc(USERS[u].name)} (คนเดียว)</option>`).join('')}<option value="both" ${rpTBy(HOMEROOM[L]||[],st)==='both'?'selected':''}>ทั้งสองท่าน (ลงนาม 2 คน)</option></select></label>`:''}${(()=>{const miss=st.t?rpSigners(HOMEROOM[L]||[],st).filter(u=>!S.sigs[u]):[];return miss.length?`<span class="small" style="color:var(--bad)">${miss.map(u=>esc(USERS[u].name)).join(' และ ')} ยังไม่มีลายเซ็นในระบบ (สร้างที่เมนู "ลายเซ็นของฉัน")</span>`:'';})()}<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>${st.dir&&!S.school.officers.dir.sig?`<span class="small" style="color:var(--bad)">ผอ. ยังไม่มีลายเซ็นในระบบ (แอดมินตั้งที่หน้า “ตั้งค่าโรงเรียน”)</span>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
+ <div class="row">${D.mode==='p1'?'<span class="small muted">ภาคเรียนที่ 1 ประถมแสดงคะแนนเสมอ (ยังไม่มีเกรด)</span>':`<label><input type="checkbox" id="rpsc" data-rsg="sc" ${st.sc!==false?'checked':''}> แสดงคะแนนรวมในใบแจ้งผล</label>`}<label><input type="checkbox" data-rsg="cw" ${st.cw!==false?'checked':''}> แสดง${D.pri?'น้ำหนัก':'หน่วยกิต'}รายวิชา (ในใบแจ้งผลและหน้านักเรียนดูผลออนไลน์)</label><label><input type="checkbox" data-rsg="t" ${st.t?'checked':''}> ลงนามครูที่ปรึกษา</label>${(HOMEROOM[L]||[]).length>1&&(isAdmin()||(HOMEROOM[L]||[]).includes(S.role))?`<label class="small">ผู้ลงนาม <select data-rsgby="1">${(HOMEROOM[L]||[]).map(u=>`<option value="${u}" ${rpTBy(HOMEROOM[L]||[],st)===u?'selected':''}>${esc(USERS[u].name)} (คนเดียว)</option>`).join('')}<option value="both" ${rpTBy(HOMEROOM[L]||[],st)==='both'?'selected':''}>ทั้งสองท่าน (ลงนาม 2 คน)</option></select></label>`:''}${(()=>{const miss=st.t?rpSigners(HOMEROOM[L]||[],st).filter(u=>!S.sigs[u]):[];return miss.length?`<span class="small" style="color:var(--bad)">${miss.map(u=>esc(USERS[u].name)).join(' และ ')} ยังไม่มีลายเซ็นในระบบ (สร้างที่เมนู "ลายเซ็นของฉัน")</span>`:'';})()}<label><input type="checkbox" data-rsg="dir" ${st.dir?'checked':''}> ลงนาม ผอ.</label>${st.dir&&!S.school.officers.dir.sig?`<span class="small" style="color:var(--bad)">ผอ. ยังไม่มีลายเซ็นในระบบ (แอดมินตั้งที่หน้า “ตั้งค่าโรงเรียน”)</span>`:''}</div>`:'<div class="empty">ห้องนี้ยังไม่มีนักเรียน</div>'}</div>
  ${(()=>{const am=actMissing(L);return am.length?`<div class="lock small"><b>⚠️ ผลกิจกรรมพัฒนาผู้เรียนยังไม่ครบ</b> ใบแจ้งผลจะแสดง “-” ในช่องที่ยังไม่ตัดสิน: ${am.map(x=>`${esc(x.a)} (${x.noClub?'ยังไม่มีชุมนุม '+x.miss+' คน':'ยังไม่ตัดสิน '+x.miss+' คน'} · ${esc(x.noClub?'':x.whoTxt)})`).join(' · ')} <button class="btn sm alt" data-go="acts" data-actgo="${L}">ไปกรอกกิจกรรม</button></div>`:'';})()}
  ${D.cal.length?'':'<div class="card empty">ชั้นนี้ยังไม่มีรายวิชาที่เปิดสอนในภาคเรียนนี้</div>'}
  ${D.stus.length&&D.cal.length?rptPage(L,s,D):''}</div>`;};
@@ -720,7 +721,7 @@ function pubWatch(){const k=pubId(S.term);if(k===pubKey)return;pubKey=k;if(pubUn
  pubUnsub=onSnapshot(doc(db,'publishMeta',k),s=>{S.pubMeta=s.exists()?s.data():{};render();},e=>{S.pubMeta={};report(e);});}
 const hashStr=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36);};
 // ข้อมูลผลการเรียนของนักเรียน 1 คน (คำนวณแบบเดียวกับใบแจ้งผล)
-function pubData(L,s,D){const T=D.T,M=D.mode,pri=D.pri,p1=M==='p1',hideCr=pri&&(S.rpt[L]||{}).cw===false;
+function pubData(L,s,D){const T=D.T,M=D.mode,pri=D.pri,p1=M==='p1',hideCr=(S.rpt[L]||{}).cw===false;
  const rows=D.cal.map(x=>{const c=x.c,r=x.R.find(q=>q.s.id===s.id)||{},k=c.code+'|'+T,fx=((S.fix[k]||{})[s.id])||{},ev=((S.ev[k]||{})[s.id])||{};
   const g=p1||r.g==null?null:r.g,after=p1?'':String(fx.after||'').trim(),afN=after!==''&&!isNaN(+after)?+after:null;
   const eff=afN!=null?afN:(typeof g==='number'?g:null),score=p1?r.cur:M==='p2'?r.sum:r.tot;
@@ -1181,7 +1182,7 @@ reg('change', (e) => {
     if (v) notify(v, `${me().name} มอบหมายให้คุณเป็นผู้ตัดสินกิจกรรม${a} ชั้น ${L}`, 'acts'); render() }
   else if (t.id === 'gd') { const g = { ...(S.guidance && typeof S.guidance === 'object' ? S.guidance : {}) }; if (t.value === 'none') delete g[S.actLevel]; else g[S.actLevel] = t.value; S.guidance = g; render() }
   else if (t.id === 'hrs') { cfgOf(S.scCode).hours = Math.max(1, +t.value || 40); render() }
-  else if (t.id === 'crd') { const c = CAT.find((x) => x.code === S.scCode), v = parseFloat(t.value); cfgOf(S.scCode, crKeyT(S.term, isPri(c.level))).credit = v > 0 ? Math.round(v * 100) / 100 : null; render() }
+  else if (t.id === 'crd') { const c = CAT.find((x) => x.code === S.scCode), v = parseFloat(t.value); cfgOf(S.scCode, crKeyT(S.term, isPri(c.level))).credit = CRV.includes(v) ? v : null; render() }
   else if (t.dataset.ab !== undefined) { const H = cfgOf(S.scCode).hours, a = (S.ab[S.scCode] = S.ab[S.scCode] || {}); (a[t.dataset.ab] = a[t.dataset.ab] || {})[S.term] = t.value === '' ? 0 : Math.max(0, Math.min(H, +t.value)); render() }
   else if (t.id === 'scl') { cfgOf(S.scCode).scale = +t.value; render() }
   else if (t.dataset.cn !== undefined) { cfgOf(S.scCode).cols[+t.dataset.cn].n = t.value }
