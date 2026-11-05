@@ -35,7 +35,7 @@ const defaultSchool = () => ({
 const S = {
   page: 'scores', term: 1, year: 0, role: '', scCode: null,
   scores: {}, cfg: {}, ab: {}, rs: {}, ev: {}, sign: {}, fix: {}, meta: {}, acts: {}, members: {}, rpt: {}, att: {}, sub: {},
-  sigs: {}, school: defaultSchool(), guidance: 'none', regs: [], openSubj: new Set(), notes: [],
+  sigs: {}, school: defaultSchool(), guidance: {}, actTeach: {}, regs: [], openSubj: new Set(), notes: [],
   evKind: 'a', actLevel: 'ป.3', rpLevel: 'ป.3', rpStu: null, clubLv: 'ป.3', allSubj: false, sumLv: null,
 }
 const BUCKETS = ['scores', 'cfg', 'ab', 'rs', 'ev', 'sign', 'fix', 'meta', 'acts', 'members', 'rpt', 'att', 'sub']
@@ -310,17 +310,21 @@ P.scores=()=>{
 const ACTS=['ชุมนุม','แนะแนว','ลูกเสือ-เนตรนารี','กิจกรรมเพื่อสังคมและสาธารณประโยชน์'];
 // ประถม: กิจกรรมพัฒนาผู้เรียนทุกกิจกรรมตัดสินเมื่อจบภาคเรียนที่ 2 (ภาคเรียนที่ 1 ยังตัดสินไม่ได้)
 const actLockT=L=>isPri(L)&&S.term===1;
+// ครูแนะแนวกำหนดแยกรายชั้น: S.guidance = { 'ป.1': uid, ... }
+const gOf=L=>(S.guidance&&typeof S.guidance==='object'&&S.guidance[L])||null;
+// ผู้ตัดสินกิจกรรมรายชั้น: แนะแนวใช้ S.guidance · ลูกเสือ-เนตรนารี และกิจกรรมเพื่อสังคมฯ ใช้ S.actTeach[กิจกรรม][ชั้น] (ไม่กำหนด = ครูที่ปรึกษา)
+const tOf=(a,L)=>a==='แนะแนว'?gOf(L):(((S.actTeach||{})[a]||{})[L]||null);
 P.acts=()=>{
  const L=S.actLevel,stu=ACT().filter(s=>s.level===L),hr=HOMEROOM[L]||[];
- const guidanceTeacher=S.guidance!=='none'&&S.guidance;
- const who=a=>a==='ชุมนุม'?'ครูผู้สอนชุมนุม':a==='แนะแนว'?(guidanceTeacher?'ครูแนะแนว ('+USERS[S.guidance].name+')':'ครูที่ปรึกษา (ไม่มีครูแนะแนว)'):'ครูที่ปรึกษา';
- const canBase=a=>isAdmin()||(a==='แนะแนว'&&guidanceTeacher?S.guidance===S.role:hr.includes(S.role));
+ const who=a=>{const t=tOf(a,L);return t?`${a==='แนะแนว'?'ครูแนะแนว':'ครูผู้สอน'}ชั้น ${L} (${USERS[t].name})`:'ครูที่ปรึกษา';};
+ const canBase=a=>{const t=tOf(a,L);return isAdmin()||(t?t===S.role:hr.includes(S.role));};
+ const pick=a=>isAdmin()?`<label class="row small" style="gap:6px">ผู้ตัดสินชั้น ${L}<select data-actt="${esc(a)}" aria-label="ผู้ตัดสิน${esc(a)} ชั้น ${L}"><option value="none">ครูที่ปรึกษา</option>${TEACHERS.map(k=>`<option value="${k.uid}" ${tOf(a,L)===k.uid?'selected':''}>${esc(k.name)}</option>`).join('')}</select></label>`:`<span class="small muted">ผู้ตัดสิน: ${who(a)}</span>`;
  return `<div class="stack"><div class="row">${LEVELS.map(l=>`<button class="chip" aria-pressed="${S.actLevel===l}" data-actlv="${l}">${l}</button>`).join('')}</div>
  <div class="small muted">ที่ปรึกษาห้อง ${L}: ${hr.map(h=>USERS[h].name).join(', ')||'ยังไม่กำหนด'}</div>
- ${isAdmin()?`<div class="row"><label for="gd">ครูแนะแนว</label><select id="gd"><option value="none">ไม่มี (ให้ครูที่ปรึกษากรอก)</option>${TEACHERS.map(k=>`<option value="${k.uid}" ${S.guidance===k.uid?'selected':''}>${esc(k.name)}</option>`).join('')}</select></div>`:''}
+ ${isAdmin()?`<div class="small muted">แอดมินเลือกผู้ตัดสินของแต่ละกิจกรรมได้ในการ์ด (กำหนดแยกทีละชั้น) ถ้าไม่เลือก ครูที่ปรึกษาเป็นผู้ตัดสิน</div>`:''}
  ${ACTS.filter(a=>a!=='ชุมนุม').map(a=>{const key=L+'|'+a,st=S.acts[key]||(S.acts[key]={owner:null,v:{}});
-  const can=canBase(a),locked=st.owner&&st.owner!==S.role&&!isAdmin()&&!(a==='แนะแนว'&&guidanceTeacher);
-  return `<div class="card stack"><div class="row" style="justify-content:space-between"><h3>${a}</h3><span class="small muted">ผู้ตัดสิน: ${who(a)}</span></div>
+  const can=canBase(a),locked=st.owner&&st.owner!==S.role&&!isAdmin()&&!tOf(a,L);
+  return `<div class="card stack"><div class="row" style="justify-content:space-between"><h3>${a}</h3>${pick(a)}</div>
   ${!can?'<div class="lock small">กิจกรรมนี้ไม่ใช่หน้าที่ของคุณ</div>':locked?`<div class="lock small">${esc(USERS[st.owner].name)} กรอกกิจกรรมนี้ของห้อง ${L} แล้ว คุณกรอกซ้ำไม่ได้</div>`:
    `${st.owner?`<div class="small muted">กรอกโดย ${esc(USERS[st.owner].name)} ${isAdmin()?`<button class="btn sm alt" data-act="release" data-key="${esc(key)}">ปล่อยสิทธิ์</button>`:''}</div>`:''}
    ${actLockT(L)?'<div class="lock small">ประถมตัดสินผลกิจกรรมพัฒนาผู้เรียนเมื่อจบภาคเรียนที่ 2 (ผลทั้งปี) <button class="btn sm alt" data-term="2">ไปภาคเรียนที่ 2</button></div>':`<div class="row"><button class="btn sm" data-act="allpass" data-key="${esc(key)}">ผ่านทั้งห้อง</button></div>`}
@@ -518,7 +522,7 @@ P.p5=()=>{
 
 const GUIDE={
  super:[['ตั้งปีการศึกษา','เปิดปีการศึกษาและภาคเรียน ปิดปีเมื่อสิ้นปีเพื่อเก็บข้อมูลและเลื่อนชั้น','years'],['สร้างบัญชีผู้ใช้','สร้างแอดมินโรงเรียนและครู กำหนดรหัสเริ่มต้น รีเซ็ตรหัสเมื่อลืม และส่งออกใบรหัส','users'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่จะเปิดสอนในปีและภาคเรียนนี้','catalog'],['เพิ่มนักเรียน','เพิ่มทีละคนหรือวางรายชื่อหลายคน ใส่เลขประจำตัวนักเรียนให้ครบ (นักเรียนใช้เลขนี้ดูผลการเรียน) ระบบเลื่อนชั้นให้เองตอนขึ้นปีใหม่','students'],['อนุมัติการสอน','ตรวจที่ครูลงทะเบียน อนุมัติ หรือส่งกลับพร้อมข้อความ รวมถึงคำขอแก้ไขการลงทะเบียน (ขอเพิ่ม/เอาวิชาออก) · แอดมินที่สอนด้วยให้ลงทะเบียน "วิชาที่ฉันสอน" ไว้ ชื่อจึงจะขึ้นเป็นครูผู้สอน','reg'],['ติดตามความคืบหน้า','เลือกดูทีละชั้นหรือทุกชั้น และสลับเป็นมุมมอง "รายครู" ดูว่าครูแต่ละคนส่งผลครบหรือยัง','progress'],['เผยแพร่ผลให้นักเรียน','เลือกว่านักเรียนเห็นคะแนนหรือเฉพาะเกรด แล้วกดเผยแพร่รายชั้น ถ้าครูแก้คะแนนภายหลังให้กด "เผยแพร่ใหม่"','publish'],['ประกาศหน้าแรก','เพิ่ม แก้ไข ปักหมุด ซ่อน หรือลบประกาศ ตั้ง "วันที่กำหนด" เช่น วันผลการเรียนออก หน้าแรกนับถอยหลังและขึ้นประกาศใหม่ให้เองเมื่อถึงวัน','news'],['ติดตามและส่งออก','ดูเอกสารของแต่ละวิชาและดาวน์โหลดเป็นหลักฐาน','p5']],
- admin:[['ตั้งค่าโรงเรียน','กรอกชื่อและลายเซ็นของ ผอ. หัวหน้างานวัดผล หัวหน้างานวิชาการ และหัวหน้ากลุ่มสาระ และกำหนดครูที่ปรึกษาประจำชั้น','school'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่เปิดสอนในภาคเรียนนี้ ทีละวิชาหรือหลายวิชา','catalog'],['จัดการนักเรียน','เพิ่มนักเรียนใหม่ ย้ายเข้า หรือวางรายชื่อหลายคน ใส่เลขประจำตัวนักเรียนให้ครบ','students'],['อนุมัติการสอน','ตรวจรายการที่ครูลงทะเบียนและคำขอแก้ไข ถ้าไม่ถูกต้องส่งกลับพร้อมข้อความ','reg'],['ติดตามความคืบหน้า','เลือกดูทีละชั้น หรือมุมมอง "รายครู" ว่าครูคนไหนส่งผลครบแล้ว','progress'],['จัดชุมนุม','สร้างชุมนุมและเลือกครูผู้สอนชุมนุม ระบบเตือนเมื่อนักเรียนอยู่หลายชุมนุม','acts'],['ลงนามและอนุมัติเล่ม','ในหน้าสมุด ปพ.5 ติ๊กลงนามของหัวหน้าฝ่ายต่าง ๆ และให้ ผอ. อนุมัติ พร้อมวันที่','p5'],['เผยแพร่ผลและประกาศ','เผยแพร่ผลการเรียนรายชั้นให้นักเรียนดูออนไลน์ และลงประกาศบนหน้าแรก','publish'],['ดาวน์โหลดเอกสาร','ดาวน์โหลด ปพ.5 ของแต่ละวิชาและเอกสารสรุป','p5']],
+ admin:[['ตั้งค่าโรงเรียน','กรอกชื่อและลายเซ็นของ ผอ. หัวหน้างานวัดผล หัวหน้างานวิชาการ และหัวหน้ากลุ่มสาระ และกำหนดครูที่ปรึกษาประจำชั้น','school'],['เตรียมรายวิชา','เลือกวิชาจากคลังที่เปิดสอนในภาคเรียนนี้ ทีละวิชาหรือหลายวิชา','catalog'],['จัดการนักเรียน','เพิ่มนักเรียนใหม่ ย้ายเข้า หรือวางรายชื่อหลายคน ใส่เลขประจำตัวนักเรียนให้ครบ','students'],['อนุมัติการสอน','ตรวจรายการที่ครูลงทะเบียนและคำขอแก้ไข ถ้าไม่ถูกต้องส่งกลับพร้อมข้อความ','reg'],['ติดตามความคืบหน้า','เลือกดูทีละชั้น หรือมุมมอง "รายครู" ว่าครูคนไหนส่งผลครบแล้ว','progress'],['จัดผู้ตัดสินกิจกรรม','เลือกชั้นก่อน แล้วเลือกผู้ตัดสินแนะแนว ลูกเสือ-เนตรนารี และกิจกรรมเพื่อสังคมฯ ในการ์ดของแต่ละกิจกรรม (ไม่เลือก = ครูที่ปรึกษา) · สร้างชุมนุมของชั้นนั้นพร้อมเลือกครูผู้สอน ระบบเตือนเมื่อนักเรียนอยู่หลายชุมนุม','acts'],['ลงนามและอนุมัติเล่ม','ในหน้าสมุด ปพ.5 ติ๊กลงนามของหัวหน้าฝ่ายต่าง ๆ และให้ ผอ. อนุมัติ พร้อมวันที่','p5'],['เผยแพร่ผลและประกาศ','เผยแพร่ผลการเรียนรายชั้นให้นักเรียนดูออนไลน์ และลงประกาศบนหน้าแรก','publish'],['ดาวน์โหลดเอกสาร','ดาวน์โหลด ปพ.5 ของแต่ละวิชาและเอกสารสรุป','p5']],
  teacher:[['ลงทะเบียนวิชาที่สอน','กดเลือกชั้นทีละชั้น แล้วติ๊กวิชาที่สอน (วิชาของชั้นอื่นที่ติ๊กไว้ยังอยู่ ดูได้ในกล่อง "วิชาที่เลือกไว้ทั้งหมด") ส่งให้แอดมินอนุมัติทุกภาคเรียน · อนุมัติแล้วถ้าลงไม่ครบ กด "แก้ไขการลงทะเบียน" ขอเพิ่มได้','reg'],['รอการอนุมัติ','ถ้าแอดมินส่งกลับจะมีแจ้งเตือนและข้อความ ให้แก้แล้วส่งใหม่','reg'],['ตั้งช่องคะแนนเก็บ','ตั้งว่าเก็บกี่ช่อง ช่องละเท่าไร ประถมเลือกเก็บ 100 หรือ 50 ต่อภาคเรียน','scores'],['กรอกคะแนน','กรอกในตาราง หรือกด "ดาวน์โหลดแบบกรอกคะแนน (Excel)" ไปกรอกใน Excel / Google ชีต แล้ว "แนบไฟล์คะแนน" ระบบกรอกให้อัตโนมัติ · ชั่วโมงที่ขาดกรอกเฉพาะคนที่ขาด ผู้ที่เวลาเรียนต่ำกว่า 80% ได้ มส.','scores'],['เช็คชื่อรายวัน (ถ้าใช้)','เพิ่มวันเรียนต่อจากของเดิม หน้าละ 20 วัน กดเลขหน้าเพื่อดูวันก่อนหน้า','att'],['ตัดสินกิจกรรม','ชุมนุมเลือกสมาชิกของตน ส่วนลูกเสือและกิจกรรมเพื่อสังคมเป็นของครูที่ปรึกษา · ประถมตัดสินผลกิจกรรมในภาคเรียนที่ 2','acts'],['ประเมินผู้เรียน','ให้คะแนนคุณลักษณะ การอ่าน คิดวิเคราะห์ เขียน และสมรรถนะ รายข้อ ทีละคนหรือทั้งห้อง ระบบสรุปผลให้ (ประถมกรอกภาคเรียนที่ 2)','eval'],['ส่งผล','กรอกครบทุกคนแล้วกด "ส่งผล" ที่หน้าความคืบหน้า ถ้าต้องแก้ กด "ยกเลิกส่ง"','progress'],['ใบแจ้งผลและสรุปห้อง (ครูที่ปรึกษา)','เห็นเฉพาะห้องที่เป็นครูที่ปรึกษา ดาวน์โหลด PDF ใบแจ้งผลรายบุคคลหรือทั้งห้อง พร้อมลงนาม','report'],['สร้างลายเซ็น','วาดหรือแนบภาพลายเซ็น ระบบลบพื้นหลังให้ ใช้ลงชื่อในเล่ม ปพ.5 และใบแจ้งผล','sign'],['กรอกข้อมูลประกอบเล่ม','คำอธิบายรายวิชา มาตรฐาน/ตัวชี้วัดและเวลาของแต่ละหน่วย แล้วดูรายการตรวจความครบถ้วน','p5'],['ลงนามและดาวน์โหลด ปพ.5','กดลงลายมือชื่อครูผู้สอน ตรวจครบแล้วดาวน์โหลดเป็นหลักฐาน ระบบตั้งชื่อไฟล์ให้','p5']]};
 P.guide=()=>{const k=me().kind,NM={super:'แอดมินหลัก',admin:'แอดมินโรงเรียน',teacher:'ครูผู้สอน'}
  const tabs=k==='super'?['super','admin','teacher']:k==='admin'?['admin','teacher']:['teacher']
@@ -815,14 +819,17 @@ function clubOfStu(id, except) { return Object.entries(S.members).find(([n, m]) 
 const clubJudge = (s) => !(isPri(s.level) && S.term === 1)
 function clubsHtml() {
   const admin = isAdmin(), clubs = Object.entries(S.members).sort((a, b) => a[0].localeCompare(b[0], 'th'))
-  const L = S.clubLv, pool = ACT().filter((s) => s.level === L)
+  const L = S.actLevel, pool = ACT().filter((s) => s.level === L)
+  const inLv = (m) => !(m.lv && m.lv.length) || m.lv.includes(L)
   const tOpts = (cur) => TEACHERS.map((t) => `<option value="${t.uid}" ${cur === t.uid ? 'selected' : ''}>${esc(t.name)}</option>`).join('')
+  const shown = clubs.filter(([, m]) => inLv(m))
   const dup = ACT().map((s) => [s, Object.entries(S.members).filter(([, m]) => (m.ids || []).includes(s.id)).map(([n]) => n)]).filter(([, a]) => a.length > 1)
-  return `<div class="card stack"><h3>ชุมนุม</h3>
+  return `<div class="card stack"><h3>ชุมนุม · ชั้น ${L}</h3>
   <div class="small muted">แอดมินสร้างชุมนุมและมอบหมายครูผู้สอนได้ · ครูสร้างชุมนุมของตนเองได้ · ครูผู้สอนชุมนุมเลือกสมาชิกและตัดสินผล · นักเรียน 1 คนอยู่ได้ 1 ชุมนุม${S.term === 1 ? ' · <b>ประถมตัดสินผลชุมนุมในภาคเรียนที่ 2</b> (ภาคเรียนที่ 1 จัดสมาชิกไว้ก่อนได้)' : ''}</div>
-  <div class="row"><input id="clubn" placeholder="ชื่อชุมนุมใหม่ เช่น ชุมนุมศิลปะ" size="26">${admin ? `<select id="clubt" aria-label="ครูผู้สอนชุมนุม"><option value="">ครูผู้สอน: ตัวฉันเอง</option>${tOpts('')}</select>` : ''}<button class="btn sm" data-act="newclub">สร้างชุมนุม</button></div>
+  <div class="small muted">ชุมนุมผูกกับชั้น: สร้างในชั้นไหน ครูผู้สอนดูแลเฉพาะชั้นนั้น (ชุมนุมที่รับหลายชั้นกดเพิ่มชั้นได้ในการ์ด) · เปลี่ยนชั้นที่ปุ่มด้านบนของหน้า</div>
+  <div class="row"><input id="clubn" placeholder="ชื่อชุมนุมใหม่ของชั้น ${L} เช่น ชุมนุมศิลปะ" size="30">${admin ? `<select id="clubt" aria-label="ครูผู้สอนชุมนุม"><option value="">ครูผู้สอน: ตัวฉันเอง</option>${tOpts('')}</select>` : ''}<button class="btn sm" data-act="newclub">สร้างชุมนุม</button></div>
   ${dup.length ? `<div class="lock small"><b>นักเรียนอยู่มากกว่า 1 ชุมนุม ${dup.length} คน</b> — ให้เอาออกจากชุมนุมที่ไม่ใช่<br>${dup.map(([s, a]) => `${esc(s.level)} ${esc(s.name)}: ${a.map(esc).join(', ')}`).join('<br>')}</div>` : ''}
-  ${clubs.map(([name, m]) => {
+  ${shown.map(([name, m]) => {
     const mine = m.owner === S.role || admin, ids = m.ids || []
     if (!mine) return `<div class="lock small">${esc(name)} — ครูผู้สอน: ${esc(USERS[m.owner].name)} · สมาชิก ${ids.length} คน (ไม่ใช่ชุมนุมของคุณ)</div>`
     const members = STU.filter((s) => ids.includes(s.id)).sort((a, b) => a.level.localeCompare(b.level, 'th') || (a.no || 0) - (b.no || 0))
@@ -831,14 +838,14 @@ function clubsHtml() {
     const judgeable = members.filter(clubJudge).length
     return `<div class="card stack" style="background:var(--bg,#fff)"><div class="row" style="justify-content:space-between"><b>${esc(name)}</b>
     <span class="small muted">ครูผู้สอน: ${admin ? `<select data-clubowner="${esc(name)}" aria-label="ครูผู้สอนชุมนุม ${esc(name)}">${TEACHERS.some((t) => t.uid === m.owner) ? '' : `<option value="${m.owner}" selected>${esc(USERS[m.owner].name)}</option>`}${tOpts(m.owner)}</select>` : esc(USERS[m.owner].name)}</span></div>
-    <div class="row">${LEVELS.map((l) => `<button class="chip" aria-pressed="${l === L}" data-clublv="${l}">${l}</button>`).join('')}</div>
+    <div class="row small"><b>ชั้นของชุมนุมนี้</b>${m.lv && m.lv.length ? '' : '<span class="pill p-warn">ยังไม่กำหนดชั้น (แสดงทุกชั้น)</span>'}${LEVELS.map((l) => `<button class="chip" aria-pressed="${!!(m.lv || []).includes(l)}" data-clubtl="${l}" data-club="${esc(name)}">${l}</button>`).join('')}</div>
     <div class="mgrid">${chips || '<span class="small muted">ไม่มีนักเรียนในชั้นนี้</span>'}</div>
     <div class="row small">สมาชิก ${members.length} คน
       ${pool.length ? `<button class="btn sm alt" data-act="cluballlv" data-club="${esc(name)}">เลือกทั้งชั้น ${L}</button><button class="btn sm alt" data-act="clubnonelv" data-club="${esc(name)}">เอาออกทั้งชั้น ${L}</button>` : ''}
       ${judgeable ? `<button class="btn sm alt" data-act="clubpass" data-club="${esc(name)}">ผ่านทั้งชุมนุม</button>` : ''}
       <button class="btn sm alt" data-act="delclub" data-club="${esc(name)}">ลบชุมนุม</button></div>
     ${members.length ? `<div class="tw"><table><thead><tr><th>ชื่อ</th><th>ชั้น</th><th>ผล</th></tr></thead><tbody>${members.map((s) => `<tr><td>${esc(s.name)}</td><td>${s.level}</td><td>${clubJudge(s) ? `<select data-cv="${s.id}" data-club="${esc(name)}" aria-label="ผลของ ${esc(s.name)}"><option value="">-</option><option ${(m.v || {})[s.id] === 'ผ' ? 'selected' : ''}>ผ</option><option ${(m.v || {})[s.id] === 'มผ' ? 'selected' : ''}>มผ</option></select>` : '<span class="small muted">ตัดสินภาคเรียนที่ 2</span>'}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>`
-  }).join('') || '<div class="small muted">ยังไม่มีชุมนุม</div>'}</div>`
+  }).join('') || `<div class="small muted">ชั้น ${L} ยังไม่มีชุมนุม</div>`}</div>`
 }
 function homeroomCard() {
   if (!isAdmin()) return ''
@@ -1000,7 +1007,7 @@ function downloadReport(which) {
 
 /* ---------- ตัวจัดการเหตุการณ์หลัก ---------- */
 reg('click', (e) => {
-  const t = e.target.closest('[data-gk],[data-go],[data-term],[data-actlv],[data-mem],[data-act],[data-hr],[data-clublv],[data-sumlv]')
+  const t = e.target.closest('[data-gk],[data-go],[data-term],[data-actlv],[data-mem],[data-act],[data-hr],[data-clublv],[data-clubtl],[data-sumlv]')
   if (!t || !$('#view') || !$('#view').contains(t)) return
   const d = t.dataset
   if (d.gk) { S.guideKind = d.gk; render(); return }
@@ -1009,6 +1016,7 @@ reg('click', (e) => {
   if (d.sumlv) { S.sumLv = d.sumlv; render(); return }
   if (d.actlv) { S.actLevel = d.actlv; render(); return }
   if (d.clublv) { S.clubLv = d.clublv; render(); return }
+  if (d.clubtl) { const m = S.members[d.club]; if (!m || !(isAdmin() || m.owner === S.role)) return; const lv = new Set(m.lv || []); if (lv.has(d.clubtl)) { if (lv.size <= 1) return toast('ชุมนุมต้องมีอย่างน้อย 1 ชั้น'); lv.delete(d.clubtl) } else lv.add(d.clubtl); m.lv = LEVELS.filter((l) => lv.has(l)); render(); return }
   if (d.hr) { const a = (HOMEROOM[d.hr] = HOMEROOM[d.hr] || []), i = a.indexOf(d.uid); if (i < 0) { if (a.length >= 2) return toast('ที่ปรึกษาห้องละไม่เกิน 2 คน'); a.push(d.uid) } else a.splice(i, 1); render(); return }
   if (d.mem) {
     const m = S.members[d.club]; m.ids = m.ids || []; const k = m.ids.indexOf(d.mem)
@@ -1021,11 +1029,20 @@ reg('click', (e) => {
     return
   }
   const a = d.act
-  if (a === 'newclub') { const n = ($('#clubn').value || '').trim(); if (!n) return toast('พิมพ์ชื่อชุมนุม'); if (S.members[n]) return toast('มีชุมนุมชื่อนี้แล้ว'); const ow = (isAdmin() && $('#clubt') && $('#clubt').value) || S.role; S.members[n] = { owner: ow, ids: [], v: {} }; if (ow !== S.role) notify(ow, `${me().name} มอบหมายให้คุณเป็นครูผู้สอนชุมนุม "${n}"`, 'acts'); render() }
+  if (a === 'newclub') {
+    const n = ($('#clubn').value || '').trim(); if (!n) return toast('พิมพ์ชื่อชุมนุม')
+    // ชื่อซ้ำกับชุมนุมของชั้นอื่น: ต่อท้ายด้วยชั้น เพื่อให้แต่ละชั้นมีครูผู้สอนของตัวเอง
+    let key = n
+    if (S.members[key]) { const em = S.members[key]; if (!(em.lv && em.lv.length) || em.lv.includes(S.actLevel)) return toast('ชั้นนี้มีชุมนุมชื่อนี้แล้ว'); key = `${n} (${S.actLevel})`; if (S.members[key]) return toast('ชั้นนี้มีชุมนุมชื่อนี้แล้ว') }
+    const ow = (isAdmin() && $('#clubt') && $('#clubt').value) || S.role
+    S.members[key] = { owner: ow, ids: [], v: {}, lv: [S.actLevel] }
+    if (ow !== S.role) notify(ow, `${me().name} มอบหมายให้คุณเป็นครูผู้สอนชุมนุม "${key}" ชั้น ${S.actLevel}`, 'acts')
+    render()
+  }
   else if (a === 'delclub') { const m = S.members[d.club]; if (m) ask({ title: 'ลบชุมนุม "' + d.club + '" ?', text: 'รายชื่อนักเรียนและผลของชุมนุมนี้จะถูกลบ', ok: 'ลบชุมนุม', danger: true }).then((y) => { if (y) { delete S.members[d.club]; render(); persist() } }) }
   else if (a === 'clubpass') { const m = S.members[d.club]; m.v = m.v || {}; (m.ids || []).forEach((id) => { const s = STU.find((x) => x.id === id); if (s && clubJudge(s)) m.v[id] = 'ผ' }); render() }
   else if (a === 'cluballlv' || a === 'clubnonelv') {
-    const m = S.members[d.club]; m.ids = m.ids || []; const pool = ACT().filter((s) => s.level === S.clubLv)
+    const m = S.members[d.club]; m.ids = m.ids || []; const pool = ACT().filter((s) => s.level === S.actLevel)
     if (a === 'clubnonelv') { pool.forEach((s) => { m.ids = m.ids.filter((x) => x !== s.id); m.v && delete m.v[s.id] }); render(); return }
     let skip = 0; pool.forEach((s) => { if (m.ids.includes(s.id)) return; if (clubOfStu(s.id, d.club)) { skip++; return } m.ids.push(s.id) })
     render(); if (skip) toast(`เพิ่มแล้ว · ข้าม ${skip} คนที่อยู่ชุมนุมอื่น (กดที่ชื่อเพื่อย้าย)`)
@@ -1112,7 +1129,11 @@ reg('change', (e) => {
   else if (t.id === 'allsubj') { S.allSubj = t.checked; render() }
   else if (t.id === 'sub') { S.scCode = t.value; render() }
   else if (t.id === 'rt') { cfgOf(S.scCode).ratio = t.value; render() }
-  else if (t.id === 'gd') { S.guidance = t.value; render() }
+  else if (t.dataset && t.dataset.actt) { const a = t.dataset.actt, L = S.actLevel, v = t.value === 'none' ? null : t.value
+    if (a === 'แนะแนว') { const g = { ...(S.guidance && typeof S.guidance === 'object' ? S.guidance : {}) }; if (v) g[L] = v; else delete g[L]; S.guidance = g }
+    else { const m = { ...(S.actTeach || {}) }, x = { ...(m[a] || {}) }; if (v) x[L] = v; else delete x[L]; m[a] = x; S.actTeach = m }
+    if (v) notify(v, `${me().name} มอบหมายให้คุณเป็นผู้ตัดสินกิจกรรม${a} ชั้น ${L}`, 'acts'); render() }
+  else if (t.id === 'gd') { const g = { ...(S.guidance && typeof S.guidance === 'object' ? S.guidance : {}) }; if (t.value === 'none') delete g[S.actLevel]; else g[S.actLevel] = t.value; S.guidance = g; render() }
   else if (t.id === 'hrs') { cfgOf(S.scCode).hours = Math.max(1, +t.value || 40); render() }
   else if (t.dataset.ab !== undefined) { const H = cfgOf(S.scCode).hours, a = (S.ab[S.scCode] = S.ab[S.scCode] || {}); (a[t.dataset.ab] = a[t.dataset.ab] || {})[S.term] = t.value === '' ? 0 : Math.max(0, Math.min(H, +t.value)); render() }
   else if (t.id === 'scl') { cfgOf(S.scCode).scale = +t.value; render() }
@@ -1258,7 +1279,7 @@ function flush(id) {
 }
 function report(err) { console.error(err); toast('บันทึกไม่สำเร็จ: ' + (err.code === 'permission-denied' ? 'ไม่มีสิทธิ์แก้ข้อมูลส่วนนี้' : err.message)) }
 let lastSettings = null
-function settingsJson() { return JSON.stringify({ school: S.school, homeroom: HOMEROOM, guidance: S.guidance, names: NAMES }) }
+function settingsJson() { return JSON.stringify({ school: S.school, homeroom: HOMEROOM, guidance: S.guidance, actTeach: S.actTeach || {}, names: NAMES }) }
 function persistSettings() {
   if (S.tpl || !isAdmin() || !st8.settings) return
   TEACHERS.forEach((t) => (NAMES[t.uid] = t.name))
@@ -1278,7 +1299,10 @@ function persistSig() {
 function applySettings(j) {
   const o = JSON.parse(j), d = defaultSchool()
   S.school = { ...d, ...o.school, officers: { ...d.officers, ...((o.school || {}).officers || {}) }, heads: (o.school || {}).heads || {} }
-  HOMEROOM = o.homeroom || {}; S.guidance = o.guidance || 'none'
+  HOMEROOM = o.homeroom || {}
+  // ข้อมูลเดิมเก็บครูแนะแนวคนเดียวทั้งโรงเรียน → แปลงเป็นรายชั้น (ทุกชั้นใช้คนเดิม แล้วแอดมินแก้ทีละชั้นได้)
+  S.actTeach = o.actTeach && typeof o.actTeach === 'object' ? { ...o.actTeach } : {}
+  S.guidance = o.guidance && typeof o.guidance === 'object' ? { ...o.guidance } : (o.guidance && o.guidance !== 'none' ? Object.fromEntries(LEVELS.map((l) => [l, o.guidance])) : {})
   Object.assign(NAMES, o.names || {}); rebuildUsers()
 }
 function rebuildUsers() {
