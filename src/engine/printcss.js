@@ -44,5 +44,6 @@ thead{display:table-header-group}tr{break-inside:avoid}
 .rs3 th{font-size:calc(var(--rfs,13.5pt) - 1pt)!important;line-height:1}.rs3 td.b{font-weight:700}.rs3 td.nt{font-size:10.5pt!important;line-height:1}
 .rpsb{display:grid!important;grid-template-columns:54% 1fr;gap:5mm;align-items:start}.rsum{table-layout:auto}.rsum td{font-size:13pt!important}
 .rpss{display:grid!important;gap:3mm;grid-template-columns:1fr}.rpss .sg{font-size:13pt;margin-top:2mm}
-.rpsl{min-width:0}.rpsnote{font-size:9.5pt!important;line-height:1.3;margin-top:2.5mm;text-align:left}.rpss.two{gap:0}.rpss.two .sg{font-size:11pt;margin-top:0;line-height:1.15}.rpss.two .sigln{margin-top:7.5mm}.rpss.two .sigimg{height:28px}
+.rpsl{min-width:0}.rpsnote{font-size:9.5pt!important;line-height:1.3;margin-top:2.5mm;text-align:left}.rpss.two{gap:0}.rpss.two .sg{font-size:11pt;margin-top:0;line-height:1.15}.rpss .sigln{width:46mm;margin-top:13mm}.rpss .sigln .sigimg{width:46mm;height:18mm;max-width:46mm;object-fit:contain;object-position:center bottom}.rpss.two .sigln{margin-top:12mm}.rpss.two .sigln .sigimg{height:17mm}
+.rpss.dense .sigln,.rpss.two.dense .sigln{margin-top:8.5mm}.rpss.dense .sigln .sigimg,.rpss.two.dense .sigln .sigimg{height:11.5mm}
 `

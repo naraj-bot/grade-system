@@ -547,9 +547,11 @@ P.guide=()=>{const k=me().kind,NM={super:'แอดมินหลัก',admin:
 // สถานะการบันทึกลายเซ็น: S.sigSt[target] = {state:'saving'|'ok'|'err', at, msg}
 S.sigSt={};
 const sigMark=(t,state,msg)=>{S.sigSt[t]={state,at:Date.now(),msg:msg||''};};
+let sigFly=0 // จำนวนการเขียนลายเซ็นที่ยังรอเซิร์ฟเวอร์ตอบ
+const sigSlowWatch=(targets)=>setTimeout(()=>{let ch=false;targets.forEach(t=>{const x=S.sigSt[t];if(x&&x.state==='saving'&&x.msg!=='slow'){x.msg='slow';ch=true}});if(ch)softRender()},10000)
 function sigWidget(target,label){const cur=getSig(target),st=S.sigSt[target]||{};
  const hm=t=>new Date(t).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
- const badge=st.state==='saving'?'<span class="sigst wait">⏳ กำลังบันทึกขึ้นระบบ…</span>':st.state==='err'?`<span class="sigst bad">✕ บันทึกไม่สำเร็จ ${esc(st.msg)}</span>`:st.state==='ok'?`<span class="sigst ok">✓ บันทึกขึ้นระบบแล้ว (${hm(st.at)} น.)</span>`:'<span class="sigst ok">✓ มีลายเซ็นในระบบแล้ว</span>';
+ const badge=st.state==='saving'?`<span class="sigst wait">⏳ กำลังบันทึกขึ้นระบบ…${st.msg==='slow'?' นานกว่าปกติ — ตรวจสอบอินเทอร์เน็ต (ระบบจะส่งต่อให้เองเมื่อสัญญาณกลับมา)':''}</span>`:st.state==='err'?`<span class="sigst bad">✕ บันทึกไม่สำเร็จ ${esc(st.msg)}</span>`:st.state==='ok'?`<span class="sigst ok">✓ บันทึกขึ้นระบบแล้ว (${hm(st.at)} น.)</span>`:'<span class="sigst ok">✓ มีลายเซ็นในระบบแล้ว</span>';
  return `<div class="card stack"><b>${label}</b>
  ${cur?`<div class="sigbox"><div class="row" style="justify-content:space-between"><b class="small">ลายเซ็นปัจจุบัน</b>${badge}</div><img class="sigprev" src="${cur}" alt="ลายเซ็นปัจจุบัน"></div>`:`<div class="sigbox none">${st.state==='err'?`<span class="sigst bad">✕ บันทึกไม่สำเร็จ ${esc(st.msg)}</span>`:'<span class="small muted">ยังไม่มีลายเซ็น · วาดในกรอบด้านล่างแล้วกด “บันทึกลายเซ็นที่วาด” หรือกด “แนบภาพลายเซ็น”</span>'}</div>`}
  <div class="small muted">${cur?'วาดลายเซ็นใหม่ (ถ้าต้องการเปลี่ยน)':'กรอบวาดลายเซ็น'}</div>
@@ -670,7 +672,7 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  const nC=(showSc?10:9)-(showCr?0:1);
  const line=x=>`<tr><td class="num">${x.c.code}</td><td>${esc(x.c.name)}</td><td class="num">${x.add?'เพิ่มเติม':'พื้นฐาน'}</td>${showCr?`<td class="num">${fmtCr(x.cr)}</td>`:''}${showSc?`<td class="num${p1?' b':''}">${x.score==null?'-':Math.round(x.score+1e-9)}</td>`:''}<td class="num b">${x.g==null?'-':x.g}</td><td class="num b">${esc(x.after)}</td><td class="num">${x.ea==null?'-':x.ea}</td><td class="num">${x.er==null?'-':x.er}</td><td class="nt"></td></tr>`;
  const aLine=a=>`<tr><td></td><td>${esc(a.n)}</td><td class="num">กิจกรรม</td>${showCr?'<td></td>':''}${showSc?'<td class="num">-</td>':''}<td class="num b">${p1?'-':a.v}</td><td></td><td></td><td></td><td></td></tr>`;
- const n0=rows.length+acts.length,n=n0+(rpSigners(hr,st).length>1?3:0),fs=n<=16?13.5:n<=18?12.5:n<=20?12:n<=22?11.5:n<=25?10.5:n<=28?9.5:n<=32?8.5:7.5;
+ const n0=rows.length+acts.length,n=n0+(rpSigners(hr,st).length>1?3:2),fs=n<=16?13.5:n<=18?12.5:n<=20?12:n<=22?11.5:n<=25?10.5:n<=28?9.5:n<=32?8.5:7.5;
  const signers=rpSigners(hr,st),two=signers.length>1,sigD=st.dir?sc.officers.dir.sig:null;
  const sg=(img,name,role)=>`<div class="sg"><div>ลงชื่อ ${img?sigImg(img):'<span class="sigln"></span>'}</div><div>( ${name||'..............................................'} )</div><div>${role}</div></div>`;
  const lvTxt=(pri?'ประถมศึกษาปีที่ ':'มัธยมศึกษาปีที่ ')+L.replace(/^[ปม]\./,'');
@@ -693,7 +695,7 @@ function rptPage(L,s,D){const yr=S.year,sc=S.school,hr=(HOMEROOM[L]||[]),st=S.rp
  <tr><td>ผลการประเมินการอ่าน คิดวิเคราะห์ และเขียน</td><td class="num" colspan="2">${evR}</td></tr>
  <tr><td>ผลการประเมินกิจกรรมพัฒนาผู้เรียน</td><td class="num" colspan="2">${actAll}</td></tr></tbody></table></div>
  <div class="small rpsnote">${note}คุณลักษณะ / อ่าน คิดวิเคราะห์ เขียน: 3 = ดีเยี่ยม 2 = ดี 1 = ผ่าน 0 = ไม่ผ่าน · ร = รอการตัดสิน มส = ไม่มีสิทธิ์รับการตัดสิน · ผ = ผ่าน มผ = ไม่ผ่าน${showCr?` · ${crW} 1.0 = 40 ชั่วโมง${pri?'ต่อปี':'ต่อภาคเรียน'}`:''}</div></div>
- <div class="rpss${two?' two':''}">${(signers.length?signers:[null]).map(u=>sg(st.t&&u?S.sigs[u]:null,u?USERS[u].name:'','ครูที่ปรึกษา')).join('')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
+ <div class="rpss${two?' two':''}${n0>=24?' dense':''}">${(signers.length?signers:[null]).map(u=>sg(st.t&&u?S.sigs[u]:null,u?USERS[u].name:'','ครูที่ปรึกษา')).join('')}${sg(sigD,sc.officers.dir.name,'ผู้บริหารสถานศึกษา')}${sg(null,'','ผู้ปกครอง')}</div></div>
  </div>`;}
 
 P.report=()=>{const RL=sumLevels();if(!RL.length)return '<div class="card empty">ใบแจ้งผลการเรียนพิมพ์ได้เฉพาะครูที่ปรึกษาประจำชั้น (แอดมินกำหนดครูที่ปรึกษาที่หน้า "ตั้งค่าโรงเรียน")</div>';
@@ -1332,22 +1334,30 @@ function settingsJson() { return JSON.stringify({ school: S.school, homeroom: HO
 function persistSettings() {
   if (S.tpl || !isAdmin() || !st8.settings) return
   TEACHERS.forEach((t) => (NAMES[t.uid] = t.name))
-  const j = settingsJson(); if (j === lastSettings) return
-  lastSettings = j
+  const j = settingsJson()
   const sv = Object.keys(S.sigSt).filter((t) => !t.startsWith('u:') && S.sigSt[t].state === 'saving')
+  if (j === lastSettings) { // ไม่มีอะไรต่างจากที่บันทึกไว้ (เช่นกดบันทึกภาพเดิมซ้ำ) → ไม่ต้องค้างสถานะ "กำลังบันทึก"
+    if (sv.length && !sigFly) { sv.forEach((t) => sigMark(t, 'ok')); softRender() }
+    return
+  }
+  lastSettings = j
+  sigFly++; const w = sv.length ? sigSlowWatch(sv) : 0
   setDoc(doc(db, 'settings', 'school'), { json: j, at: Date.now() })
-    .then(() => { if (sv.length) { sv.forEach((t) => sigMark(t, 'ok')); softRender() } })
-    .catch((e) => { sv.forEach((t) => sigMark(t, 'err', /exceeds|maximum|bytes/i.test(String(e && e.message)) ? '(ข้อมูลใหญ่เกิน)' : '')); report(e); softRender() })
+    .then(() => { sigFly--; clearTimeout(w); if (sv.length) { sv.forEach((t) => sigMark(t, 'ok')); softRender() } })
+    .catch((e) => { sigFly--; clearTimeout(w); sv.forEach((t) => sigMark(t, 'err', /exceeds|maximum|bytes/i.test(String(e && e.message)) ? '(ข้อมูลใหญ่เกิน)' : '')); report(e); softRender() })
 }
 let lastSig
 function persistSig() {
   if (S.tpl || !st8.sigsLoaded) return
-  const cur = S.sigs[S.role] || null
-  if (cur === lastSig) return
+  const cur = S.sigs[S.role] || null, tg = 'u:' + S.role
+  if (cur === lastSig) { // ภาพเหมือนที่บันทึกไว้แล้ว (เช่นกด "ลบพื้นหลัง" แล้วภาพไม่เปลี่ยน) → ปิดสถานะที่ค้างอยู่
+    const x = S.sigSt[tg]; if (cur && x && x.state === 'saving' && !sigFly) { sigMark(tg, 'ok'); softRender() }
+    return
+  }
   lastSig = cur
-  if (cur) setDoc(doc(db, 'sigs', S.role), { data: cur, at: Date.now() })
-    .then(() => { sigMark('u:' + S.role, 'ok'); softRender() })
-    .catch((e) => { sigMark('u:' + S.role, 'err', e && e.code === 'permission-denied' ? '(ไม่มีสิทธิ์)' : ''); report(e); softRender() })
+  if (cur) { sigFly++; const w = sigSlowWatch([tg]); setDoc(doc(db, 'sigs', S.role), { data: cur, at: Date.now() })
+    .then(() => { sigFly--; clearTimeout(w); sigMark(tg, 'ok'); softRender() })
+    .catch((e) => { sigFly--; clearTimeout(w); sigMark(tg, 'err', e && e.code === 'permission-denied' ? '(ไม่มีสิทธิ์)' : ''); report(e); softRender() }) }
   // ลบออกจากระบบเฉพาะเมื่อผู้ใช้กด "ลบลายเซ็น" เอง (กันลายเซ็นหายจากจังหวะโหลดข้อมูล)
   else if (S.sigDelReq) { S.sigDelReq = false; deleteDoc(doc(db, 'sigs', S.role)).catch(() => {}) }
 }
